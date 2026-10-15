@@ -20,6 +20,22 @@ npm run fetch -- --missing  # télécharge seulement les sets pas encore présen
 
 Pour One Piece, ajoute la ligne du set dans [public/js/catalog.js](public/js/catalog.js) (code, `tcgGroup` TCGCSV, nom FR, année, prix du booster).
 
+## Visuels des boosters
+
+```
+npm run packs              # télécharge les vrais boosters (images TCGplayer), retire le fond blanc → public/packs/
+npm run packs -- --missing # seulement les sets qui n'ont pas encore de visuel
+```
+
+## Taux de drop
+
+Les compositions et taux de chaque booster sont dans [public/js/catalog.js](public/js/catalog.js) (`slots`, poids = % par booster).
+Ils reprennent les taux réels connus : études de pulls TCGplayer, Elite Fourum et Card Shop Live pour Pokémon,
+chiffres officiels de Riot pour Riftbound et de Wizards pour Magic, moyennes de boîtes pour One Piece, Dragon Ball et Lorcana.
+Bandai, The Pokémon Company, Konami et Ravensburger ne publient pas leurs taux : ce sont donc des moyennes observées.
+
+Pour vérifier un set : `npm run rates -- pokemon/sv03.5 onepiece/OP09` (simule 20 000 boosters).
+
 ## Mettre à jour les prix
 
 ```

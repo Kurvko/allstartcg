@@ -1,0 +1,452 @@
+{
+ "pokemon/base1": [
+  "packs/pokemon/base1-0.webp"
+ ],
+ "pokemon/base2": [
+  "packs/pokemon/base2-0.webp",
+  "packs/pokemon/base2-1.webp"
+ ],
+ "pokemon/base3": [
+  "packs/pokemon/base3-0.webp",
+  "packs/pokemon/base3-1.webp"
+ ],
+ "pokemon/base5": [
+  "packs/pokemon/base5-0.webp",
+  "packs/pokemon/base5-1.webp"
+ ],
+ "pokemon/neo1": [
+  "packs/pokemon/neo1-0.webp",
+  "packs/pokemon/neo1-1.webp"
+ ],
+ "pokemon/neo2": [
+  "packs/pokemon/neo2-0.webp",
+  "packs/pokemon/neo2-1.webp"
+ ],
+ "pokemon/neo3": [
+  "packs/pokemon/neo3-0.webp",
+  "packs/pokemon/neo3-1.webp"
+ ],
+ "pokemon/neo4": [
+  "packs/pokemon/neo4-0.webp",
+  "packs/pokemon/neo4-1.webp"
+ ],
+ "pokemon/ecard1": [
+  "packs/pokemon/ecard1-0.webp"
+ ],
+ "pokemon/ecard2": [
+  "packs/pokemon/ecard2-0.webp"
+ ],
+ "pokemon/ex1": [
+  "packs/pokemon/ex1-0.webp"
+ ],
+ "pokemon/ex2": [
+  "packs/pokemon/ex2-0.webp"
+ ],
+ "pokemon/ex3": [
+  "packs/pokemon/ex3-0.webp"
+ ],
+ "pokemon/ex4": [
+  "packs/pokemon/ex4-0.webp"
+ ],
+ "pokemon/ex5": [
+  "packs/pokemon/ex5-0.webp"
+ ],
+ "pokemon/ex6": [
+  "packs/pokemon/ex6-0.webp"
+ ],
+ "pokemon/ex8": [
+  "packs/pokemon/ex8-0.webp"
+ ],
+ "pokemon/ex9": [
+  "packs/pokemon/ex9-0.webp"
+ ],
+ "pokemon/exu": [
+  "packs/pokemon/exu-0.webp"
+ ],
+ "pokemon/ex10": [
+  "packs/pokemon/ex10-0.webp"
+ ],
+ "pokemon/ex11": [
+  "packs/pokemon/ex11-0.webp"
+ ],
+ "pokemon/ex12": [
+  "packs/pokemon/ex12-0.webp"
+ ],
+ "pokemon/ex13": [
+  "packs/pokemon/ex13-0.webp"
+ ],
+ "pokemon/ex14": [
+  "packs/pokemon/ex14-0.webp"
+ ],
+ "pokemon/ex15": [
+  "packs/pokemon/ex15-0.webp"
+ ],
+ "pokemon/ex16": [
+  "packs/pokemon/ex16-0.webp"
+ ],
+ "pokemon/dp1": [
+  "packs/pokemon/dp1-0.webp"
+ ],
+ "pokemon/dp2": [
+  "packs/pokemon/dp2-0.webp"
+ ],
+ "pokemon/dp3": [
+  "packs/pokemon/dp3-0.webp"
+ ],
+ "pokemon/dp4": [
+  "packs/pokemon/dp4-0.webp"
+ ],
+ "pokemon/dp5": [
+  "packs/pokemon/dp5-0.webp"
+ ],
+ "pokemon/dp6": [
+  "packs/pokemon/dp6-0.webp"
+ ],
+ "pokemon/dp7": [
+  "packs/pokemon/dp7-0.webp"
+ ],
+ "pokemon/pl1": [
+  "packs/pokemon/pl1-0.webp"
+ ],
+ "pokemon/pl2": [
+  "packs/pokemon/pl2-0.webp"
+ ],
+ "pokemon/pl3": [
+  "packs/pokemon/pl3-0.webp"
+ ],
+ "pokemon/hgss1": [
+  "packs/pokemon/hgss1-0.webp"
+ ],
+ "pokemon/hgss2": [
+  "packs/pokemon/hgss2-0.webp"
+ ],
+ "pokemon/hgss3": [
+  "packs/pokemon/hgss3-0.webp"
+ ],
+ "pokemon/hgss4": [
+  "packs/pokemon/hgss4-0.webp"
+ ],
+ "pokemon/col1": [
+  "packs/pokemon/col1-0.webp"
+ ],
+ "pokemon/bw1": [
+  "packs/pokemon/bw1-0.webp"
+ ],
+ "pokemon/bw2": [
+  "packs/pokemon/bw2-0.webp"
+ ],
+ "pokemon/bw3": [
+  "packs/pokemon/bw3-0.webp"
+ ],
+ "pokemon/bw4": [
+  "packs/pokemon/bw4-0.webp"
+ ],
+ "pokemon/bw5": [
+  "packs/pokemon/bw5-0.webp"
+ ],
+ "pokemon/bw6": [
+  "packs/pokemon/bw6-0.webp"
+ ],
+ "pokemon/dv1": [
+  "packs/pokemon/dv1-0.webp"
+ ],
+ "pokemon/bw7": [
+  "packs/pokemon/bw7-0.webp"
+ ],
+ "pokemon/bw8": [
+  "packs/pokemon/bw8-0.webp"
+ ],
+ "pokemon/bw9": [
+  "packs/pokemon/bw9-0.webp"
+ ],
+ "pokemon/bw10": [
+  "packs/pokemon/bw10-0.webp"
+ ],
+ "pokemon/xy1": [
+  "packs/pokemon/xy1-0.webp"
+ ],
+ "pokemon/xy2": [
+  "packs/pokemon/xy2-0.webp"
+ ],
+ "pokemon/xy3": [
+  "packs/pokemon/xy3-0.webp"
+ ],
+ "pokemon/xy4": [
+  "packs/pokemon/xy4-0.webp"
+ ],
+ "pokemon/xy5": [
+  "packs/pokemon/xy5-0.webp"
+ ],
+ "pokemon/dc1": [
+  "packs/pokemon/dc1-0.webp"
+ ],
+ "pokemon/xy6": [
+  "packs/pokemon/xy6-0.webp"
+ ],
+ "pokemon/xy7": [
+  "packs/pokemon/xy7-0.webp"
+ ],
+ "pokemon/xy8": [
+  "packs/pokemon/xy8-0.webp"
+ ],
+ "pokemon/xy9": [
+  "packs/pokemon/xy9-0.webp"
+ ],
+ "pokemon/g1": [
+  "packs/pokemon/g1-0.webp"
+ ],
+ "pokemon/xy10": [
+  "packs/pokemon/xy10-0.webp"
+ ],
+ "pokemon/xy11": [
+  "packs/pokemon/xy11-0.webp"
+ ],
+ "pokemon/xy12": [
+  "packs/pokemon/xy12-0.webp"
+ ],
+ "pokemon/sm1": [
+  "packs/pokemon/sm1-0.webp"
+ ],
+ "pokemon/sm2": [
+  "packs/pokemon/sm2-0.webp"
+ ],
+ "pokemon/sm3": [
+  "packs/pokemon/sm3-0.webp"
+ ],
+ "pokemon/sm3.5": [
+  "packs/pokemon/sm3.5-0.webp"
+ ],
+ "pokemon/sm4": [
+  "packs/pokemon/sm4-0.webp"
+ ],
+ "pokemon/sm5": [
+  "packs/pokemon/sm5-0.webp"
+ ],
+ "pokemon/sm6": [
+  "packs/pokemon/sm6-0.webp"
+ ],
+ "pokemon/sm7": [
+  "packs/pokemon/sm7-0.webp"
+ ],
+ "pokemon/sm7.5": [
+  "packs/pokemon/sm7.5-0.webp"
+ ],
+ "pokemon/sm8": [
+  "packs/pokemon/sm8-0.webp"
+ ],
+ "pokemon/sm9": [
+  "packs/pokemon/sm9-0.webp"
+ ],
+ "pokemon/det1": [
+  "packs/pokemon/det1-0.webp"
+ ],
+ "pokemon/sm10": [
+  "packs/pokemon/sm10-0.webp"
+ ],
+ "pokemon/sm11": [
+  "packs/pokemon/sm11-0.webp"
+ ],
+ "pokemon/sm115": [
+  "packs/pokemon/sm115-0.webp"
+ ],
+ "pokemon/sm12": [
+  "packs/pokemon/sm12-0.webp"
+ ],
+ "pokemon/swsh1": [
+  "packs/pokemon/swsh1-0.webp"
+ ],
+ "pokemon/swsh2": [
+  "packs/pokemon/swsh2-0.webp"
+ ],
+ "pokemon/swsh3": [
+  "packs/pokemon/swsh3-0.webp"
+ ],
+ "pokemon/swsh3.5": [
+  "packs/pokemon/swsh3.5-0.webp"
+ ],
+ "pokemon/swsh4": [
+  "packs/pokemon/swsh4-0.webp"
+ ],
+ "pokemon/swsh4.5": [
+  "packs/pokemon/swsh4.5-0.webp"
+ ],
+ "pokemon/swsh5": [
+  "packs/pokemon/swsh5-0.webp"
+ ],
+ "pokemon/swsh6": [
+  "packs/pokemon/swsh6-0.webp"
+ ],
+ "pokemon/swsh7": [
+  "packs/pokemon/swsh7-0.webp"
+ ],
+ "pokemon/cel25": [
+  "packs/pokemon/cel25-0.webp"
+ ],
+ "pokemon/swsh8": [
+  "packs/pokemon/swsh8-0.webp"
+ ],
+ "pokemon/swsh9": [
+  "packs/pokemon/swsh9-0.webp"
+ ],
+ "pokemon/swsh10": [
+  "packs/pokemon/swsh10-0.webp"
+ ],
+ "pokemon/swsh10.5": [
+  "packs/pokemon/swsh10.5-0.webp"
+ ],
+ "pokemon/swsh11": [
+  "packs/pokemon/swsh11-0.webp"
+ ],
+ "pokemon/swsh12": [
+  "packs/pokemon/swsh12-0.webp"
+ ],
+ "pokemon/swsh12.5": [
+  "packs/pokemon/swsh12.5-0.webp"
+ ],
+ "pokemon/sv01": [
+  "packs/pokemon/sv01-0.webp"
+ ],
+ "pokemon/sv02": [
+  "packs/pokemon/sv02-0.webp"
+ ],
+ "pokemon/sv03": [
+  "packs/pokemon/sv03-0.webp"
+ ],
+ "pokemon/sv03.5": [
+  "packs/pokemon/sv03.5-0.webp"
+ ],
+ "pokemon/sv04": [
+  "packs/pokemon/sv04-0.webp"
+ ],
+ "pokemon/sv04.5": [
+  "packs/pokemon/sv04.5-0.webp"
+ ],
+ "pokemon/sv05": [
+  "packs/pokemon/sv05-0.webp"
+ ],
+ "pokemon/sv06": [
+  "packs/pokemon/sv06-0.webp"
+ ],
+ "pokemon/sv06.5": [
+  "packs/pokemon/sv06.5-0.webp"
+ ],
+ "pokemon/sv07": [
+  "packs/pokemon/sv07-0.webp"
+ ],
+ "pokemon/sv08": [
+  "packs/pokemon/sv08-0.webp"
+ ],
+ "pokemon/sv08.5": [
+  "packs/pokemon/sv08.5-0.webp"
+ ],
+ "pokemon/sv09": [
+  "packs/pokemon/sv09-0.webp"
+ ],
+ "pokemon/sv10": [
+  "packs/pokemon/sv10-0.webp"
+ ],
+ "pokemon/sv10.5w": [
+  "packs/pokemon/sv10.5w-0.webp"
+ ],
+ "pokemon/sv10.5b": [
+  "packs/pokemon/sv10.5b-0.webp"
+ ],
+ "pokemon/me01": [
+  "packs/pokemon/me01-0.webp"
+ ],
+ "pokemon/me02": [
+  "packs/pokemon/me02-0.webp"
+ ],
+ "pokemon/me02.5": [
+  "packs/pokemon/me02.5-0.webp"
+ ],
+ "pokemon/me03": [
+  "packs/pokemon/me03-0.webp"
+ ],
+ "pokemon/me04": [
+  "packs/pokemon/me04-0.webp"
+ ],
+ "pokemon/me05": [
+  "packs/pokemon/me05-0.webp"
+ ],
+ "pokemon/30th": [
+  "packs/pokemon/30th-0.webp"
+ ],
+ "magic/lea": [
+  "packs/magic/lea-0.webp"
+ ],
+ "magic/blb": [
+  "packs/magic/blb-0.webp"
+ ],
+ "yugioh/LOB": [
+  "packs/yugioh/LOB-0.webp",
+  "packs/yugioh/LOB-1.webp"
+ ],
+ "yugioh/MRD": [
+  "packs/yugioh/MRD-0.webp",
+  "packs/yugioh/MRD-1.webp"
+ ],
+ "lorcana/1": [
+  "packs/lorcana/1-0.webp"
+ ],
+ "onepiece/OP-01": [
+  "packs/onepiece/OP-01-0.webp"
+ ],
+ "onepiece/OP09": [
+  "packs/onepiece/OP09-0.webp"
+ ],
+ "onepiece/PRB01": [
+  "packs/onepiece/PRB01-0.webp"
+ ],
+ "onepiece/OP10": [
+  "packs/onepiece/OP10-0.webp"
+ ],
+ "onepiece/EB02": [
+  "packs/onepiece/EB02-0.webp"
+ ],
+ "onepiece/OP11": [
+  "packs/onepiece/OP11-0.webp"
+ ],
+ "onepiece/PRB02": [
+  "packs/onepiece/PRB02-0.webp"
+ ],
+ "onepiece/OP12": [
+  "packs/onepiece/OP12-0.webp"
+ ],
+ "onepiece/OP13": [
+  "packs/onepiece/OP13-0.webp"
+ ],
+ "onepiece/OP14": [
+  "packs/onepiece/OP14-0.webp"
+ ],
+ "onepiece/EB03": [
+  "packs/onepiece/EB03-0.webp"
+ ],
+ "onepiece/OP15": [
+  "packs/onepiece/OP15-0.webp"
+ ],
+ "onepiece/OP16": [
+  "packs/onepiece/OP16-0.webp"
+ ],
+ "onepiece/OP17": [
+  "packs/onepiece/OP17-0.webp"
+ ],
+ "dragonball/FB01": [
+  "packs/dragonball/FB01-0.webp"
+ ],
+ "dragonball/FB10": [
+  "packs/dragonball/FB10-0.webp"
+ ],
+ "dragonball/B01": [
+  "packs/dragonball/B01-0.webp"
+ ],
+ "riftbound/OGN": [
+  "packs/riftbound/OGN-0.webp"
+ ],
+ "riftbound/SFD": [
+  "packs/riftbound/SFD-0.webp"
+ ],
+ "riftbound/VEN": [
+  "packs/riftbound/VEN-0.webp"
+ ]
+}

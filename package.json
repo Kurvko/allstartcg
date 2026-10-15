@@ -7,6 +7,11 @@
   "scripts": {
     "start": "node server.mjs",
     "fetch": "node scripts/fetch-data.mjs",
-    "discover": "node scripts/discover-sets.mjs"
+    "discover": "node scripts/discover-sets.mjs",
+    "packs": "node scripts/fetch-packs.mjs",
+    "rates": "node scripts/simulate-rates.mjs"
+  },
+  "devDependencies": {
+    "sharp": "^0.33.5"
   }
 }

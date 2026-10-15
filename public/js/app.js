@@ -1,8 +1,9 @@
 import { GAMES, DAILY_PACKS, findSet } from './catalog.js';
-import { loadIndex, loadSet, openPack, collectionSummary } from './data.js';
+import { loadPacks, loadSet, openPack, collectionSummary } from './data.js';
 import { getState, packsLeft, owned, recordPack, recordValue, resetAll } from './store.js';
 
 const app = document.getElementById('app');
+const PACKS = await loadPacks(); // { "pokemon/base1": ["packs/pokemon/base1-0.webp", …] }
 const modal = document.getElementById('modal');
 
 // ---------- Utilitaires ----------
@@ -38,7 +39,9 @@ async function refreshTotal() {
 
 // ---------- Composants ----------
 
-function packHtml(game, set, art, { big = false } = {}) {
+// Booster : vrai visuel s'il existe (public/packs), sinon booster dessiné avec la carte phare.
+function packHtml(game, set, art, { big = false, img = null } = {}) {
+  if (img) return `<div class="pack-real ${big ? 'pack-big' : ''}"><img src="${img}" alt="Booster ${esc(set.name)}" loading="lazy"></div>`;
   return `
     <div class="pack ${big ? 'pack-big' : ''}" style="--c:${game.color};--a:${game.accent}">
       <div class="pack-cut"><div class="crimp"></div></div>
@@ -167,7 +170,7 @@ function setTile(game, set, row) {
   const pct = Math.round((row.unique / row.total) * 100);
   return `
     <a class="set-tile" href="#/open/${row.key}" data-name="${esc(set.name.toLowerCase())}">
-      ${packHtml(game, set, row.meta.chase.img)}
+      ${packHtml(game, set, row.meta.chase.img, { img: PACKS[row.key]?.[0] })}
       <div class="progress"><i style="width:${pct}%"></i></div>
       <div class="set-tile-info"><span>${row.unique}/${row.total} cartes</span><b>${fmt(row.value)}</b></div>
     </a>`;
@@ -221,117 +224,250 @@ async function viewOpen(setKey) {
   const found = findSet(setKey);
   if (!found) return viewNotFound();
   const { game, set } = found;
-  const [data, index] = await Promise.all([loadSet(setKey), loadIndex()]);
-  const packArt = index[setKey]?.chase.img ?? chaseCard(data).img;
+  const data = await loadSet(setKey);
+  const chase = chaseCard(data);
 
   app.innerHTML = `
     <section class="open" style="--c:${game.color};--a:${game.accent}">
       <div class="open-head">
         <a href="#/game/${game.id}" class="back">← ${esc(game.short ?? game.name)}</a>
-        <div><h1>${esc(set.name)}</h1><p class="muted">${esc(game.name)} · ${set.year} · ${data.cards.length} cartes · carte phare : ${esc(chaseCard(data).name)} (${fmt(chaseCard(data).price)})</p></div>
-        <div class="open-quota">${dots(game.id)}<span class="quota-text"></span></div>
+        <div><h1>${esc(set.name)}</h1><p class="muted">${esc(game.name)} · ${set.year} · ${data.cards.length} cartes · carte phare : ${esc(chase.name)} (${fmt(chase.price)})</p></div>
+        <div class="open-quota"></div>
       </div>
       <div class="stage"></div>
     </section>`;
 
   const stage = app.querySelector('.stage');
   const quota = app.querySelector('.open-quota');
-
   const updateQuota = () => {
     quota.innerHTML = `${dots(game.id)}<span class="quota-text">${packsLeft(game.id)} / ${DAILY_PACKS} restants aujourd'hui</span>`;
   };
+  // Une illustration au hasard parmi les versions du booster.
+  const arts = PACKS[setKey] ?? [];
+  const packImg = () => arts[Math.floor(Math.random() * arts.length)];
 
+  // ---------- 1. Le booster en 3D ----------
   const showPack = () => {
     updateQuota();
+    stage.revealNext = null;
     const left = packsLeft(game.id);
+    if (left <= 0) {
+      stage.innerHTML = `
+        <div class="pack-stage">
+          ${packHtml(game, set, chase.img, { big: true, img: packImg() })}
+          <div class="limit">
+            <h3>C'est tout pour aujourd'hui 🌙</h3>
+            <p>Tes ${DAILY_PACKS} boosters ${esc(game.name)} du jour sont ouverts. Les prochains arrivent dans <b class="countdown">${untilMidnight()}</b>.</p>
+            <p class="muted">Tu peux encore ouvrir les boosters des autres jeux, ou admirer ta collection.</p>
+            <div class="row"><a class="btn" href="#/collection/${setKey}">Voir ma collection</a><a class="btn ghost" href="#/">Autres jeux</a></div>
+          </div>
+        </div>`;
+      return;
+    }
+    const img = packImg();
     stage.innerHTML = `
-      <div class="pack-stage">
-        ${packHtml(game, set, packArt, { big: true })}
-        ${left > 0
-          ? `<button class="btn primary" data-open>Ouvrir le booster</button><p class="muted hint">ou appuie sur Espace</p>`
-          : `<div class="limit">
-               <h3>C'est tout pour aujourd'hui 🌙</h3>
-               <p>Tes ${DAILY_PACKS} boosters ${esc(game.name)} du jour sont ouverts. Les prochains arrivent dans <b class="countdown">${untilMidnight()}</b>.</p>
-               <p class="muted">Tu peux encore ouvrir les boosters des autres jeux, ou admirer ta collection.</p>
-               <div class="row"><a class="btn" href="#/collection/${setKey}">Voir ma collection</a><a class="btn ghost" href="#/">Autres jeux</a></div>
-             </div>`}
+      <div class="scene">
+        <div class="pack3d-wrap">
+          <div class="pack3d">
+            <div class="p-front">
+              ${img ? `<img class="p-size" src="${img}" alt="">` : `<div class="p-size p-fake">${packHtml(game, set, chase.img)}</div>`}
+              <div class="p-body">${img ? `<img src="${img}" alt="Booster ${esc(set.name)}">` : packHtml(game, set, chase.img)}</div>
+              <div class="p-top">${img ? `<img src="${img}" alt="">` : packHtml(game, set, chase.img)}</div>
+              <div class="p-shine"${img ? ` style="-webkit-mask-image:url('${img}');mask-image:url('${img}')"` : ''}></div>
+              <div class="p-cut"><i></i></div>
+            </div>
+            <div class="p-back">${img ? `<img src="${img}" alt="">` : ''}<span>✦</span></div>
+          </div>
+        </div>
+        <div class="stack"></div>
+      </div>
+      <div class="open-actions">
+        <button class="btn primary" data-open>✂ Ouvrir le booster</button>
+        <p class="muted hint">Glisse le long du haut du booster pour le déchirer · ou appuie sur Espace</p>
       </div>`;
-    stage.querySelector('[data-open]')?.addEventListener('click', tear);
+
+    const scene = stage.querySelector('.scene');
+    const pack = stage.querySelector('.pack3d');
+    const cut = stage.querySelector('.p-cut i');
+
+    // Inclinaison qui suit la souris.
+    scene.addEventListener('pointermove', e => {
+      if (scene.classList.contains('opening')) return;
+      const r = scene.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+      pack.style.setProperty('--ry', `${x * 30}deg`);
+      pack.style.setProperty('--rx', `${-y * 20}deg`);
+      pack.style.setProperty('--mx', `${(x + 0.5) * 100}%`);
+    });
+    scene.addEventListener('pointerleave', () => { pack.style.setProperty('--ry', '0deg'); pack.style.setProperty('--rx', '0deg'); });
+
+    // Déchirure au glisser le long du haut. Écouté sur la scène : en 3D, le clic n'atteint pas toujours le booster lui-même.
+    let drag = null;
+    scene.addEventListener('pointerdown', e => {
+      const r = pack.getBoundingClientRect();
+      const inX = e.clientX >= r.left - 20 && e.clientX <= r.right + 20;
+      const inTop = e.clientY >= r.top - 20 && e.clientY - r.top <= r.height * 0.3;
+      if (!inX || !inTop || scene.classList.contains('opening')) return;
+      e.preventDefault();
+      drag = { x0: e.clientX, w: r.width };
+      scene.setPointerCapture(e.pointerId);
+      scene.classList.add('cutting');
+    });
+    scene.addEventListener('pointermove', e => {
+      if (!drag) return;
+      const p = Math.min(1, Math.abs(e.clientX - drag.x0) / (drag.w * 0.8));
+      cut.style.width = `${p * 100}%`;
+      if (p >= 1) { drag = null; tear(); }
+    });
+    const release = () => {
+      if (!drag) return;
+      drag = null;
+      scene.classList.remove('cutting');
+      cut.style.width = '0';
+    };
+    scene.addEventListener('pointerup', release);
+    scene.addEventListener('pointercancel', release);
+    scene.addEventListener('dragstart', e => e.preventDefault()); // empêche de « glisser » l'image du booster
+    stage.querySelector('[data-open]').addEventListener('click', tear);
   };
 
+  // ---------- 2. Ouverture ----------
   let busy = false;
   const tear = async () => {
-    if (busy || packsLeft(game.id) <= 0) return;
+    if (busy || packsLeft(game.id) <= 0 || !stage.querySelector('.pack3d')) return;
     busy = true;
     const cards = await openPack(setKey);
     const fresh = recordPack(game.id, setKey, cards); // enregistré tout de suite : recharger la page ne relance pas le tirage
     updateQuota();
 
-    const packEl = stage.querySelector('.pack');
-    stage.querySelector('[data-open]').disabled = true;
-    packEl.classList.add('shake');
-    await Promise.all([preload(cards.map(c => c.img)), sleep(700)]);
-    packEl.classList.add('torn');
-    await sleep(650);
+    const scene = stage.querySelector('.scene');
+    const pack = stage.querySelector('.pack3d');
+    stage.querySelector('.open-actions').innerHTML = '<p class="muted hint">…</p>';
+    const cut = stage.querySelector('.p-cut i');
+    scene.classList.add('opening');
+    pack.style.setProperty('--ry', '0deg');
+    pack.style.setProperty('--rx', '0deg');
+    cut.style.transition = 'width .35s ease-out';
+    cut.style.width = '100%';
+    const loading = preload(cards.map(c => c.img));
+    await sleep(380);
+    scene.classList.add('torn');                // la languette s'arrache
+    await Promise.all([loading, sleep(650)]);
+    buildStack(cards, fresh);
+    scene.classList.add('emerge');              // les cartes sortent, le booster tombe
+    await sleep(1100);
+    scene.classList.add('ready');
     busy = false;
-    showCards(cards, fresh);
   };
 
-  const showCards = (cards, fresh) => {
-    stage.innerHTML = `
-      <div class="reveal">
-        <div class="cards">
-          ${cards.map((c, i) => `
-            <div class="flip tier-${c.tier}" style="--i:${i}" data-i="${i}">
-              <div class="flip-inner">
-                <div class="face face-back"><span>✦</span><small>${esc(game.name)}</small></div>
-                <div class="face front tilt"><img src="${c.img}" alt="${esc(c.name)}"><div class="shine"></div>
-                  ${fresh.has(c.id) ? '<span class="new">NOUVEAU</span>' : ''}
-                </div>
-              </div>
-              <div class="flip-label"><span>${esc(RARITY_LABEL(c.rarity))}</span><b>${fmt(c.price)}</b></div>
-            </div>`).join('')}
-        </div>
-        <div class="reveal-bar">
-          <button class="btn" data-all>Tout révéler</button>
-          <p class="muted hint">Clique sur les cartes · Espace pour la suivante</p>
-        </div>
-      </div>`;
+  // ---------- 3. Révélation carte par carte ----------
+  const buildStack = (cards, fresh) => {
+    const stack = stage.querySelector('.stack');
+    stack.innerHTML = `
+      ${cards.map((c, i) => `
+        <div class="scard tier-${c.tier}" style="--i:${i};--n:${cards.length}" data-i="${i}">
+          <div class="scard-inner">
+            <div class="face face-back"><span>✦</span><small>${esc(game.short ?? game.name)}</small></div>
+            <div class="face front"><img src="${c.img}" alt="${esc(c.name)}"><div class="shine"></div>
+              ${fresh.has(c.id) ? '<span class="new">NOUVEAU</span>' : ''}</div>
+          </div>
+        </div>`).join('')}
+      <div class="scard-label" hidden></div>`;
+    stage.querySelector('.open-actions').innerHTML = `
+      <div class="tray"></div>
+      <div class="row">
+        <span class="muted counter">0 / ${cards.length}</span>
+        <button class="btn" data-next>Carte suivante</button>
+        <button class="btn ghost" data-all>Tout révéler</button>
+      </div>
+      <p class="muted hint">Clique sur le paquet ou appuie sur Espace pour retourner la carte du dessus</p>`;
 
-    const flips = [...stage.querySelectorAll('.flip')];
-    let revealed = 0;
-    const reveal = el => {
-      if (el.classList.contains('open')) {
-        openModal(cards[+el.dataset.i], game, owned(setKey)[cards[+el.dataset.i].id]);
-        return;
-      }
-      el.classList.add('open');
-      bindTilt(el.querySelector('.tilt'));
-      const card = cards[+el.dataset.i];
-      if (card.tier >= 4) setTimeout(() => confetti(el, game.color), 250);
-      if (++revealed === cards.length) finish();
+    const els = [...stack.querySelectorAll('.scard')];
+    const label = stack.querySelector('.scard-label');
+    const tray = stage.querySelector('.tray');
+    const counter = stage.querySelector('.counter');
+    let current = -1;   // carte affichée face visible
+    let flipping = false;
+
+    const toTray = i => {
+      const el = els[i];
+      el.classList.add('gone');
+      const c = cards[i];
+      tray.insertAdjacentHTML('beforeend',
+        `<button class="tray-card tier-${c.tier}" data-i="${i}" title="${esc(c.name)} · ${fmt(c.price)}"><img src="${c.img}" alt=""></button>`);
     };
-    flips.forEach(el => el.addEventListener('click', () => reveal(el)));
-    stage.querySelector('[data-all]').addEventListener('click', async () => {
-      for (const el of flips.filter(f => !f.classList.contains('open'))) { reveal(el); await sleep(110); }
-    });
-    stage.revealNext = () => { const next = flips.find(f => !f.classList.contains('open')); if (next) reveal(next); };
 
-    const finish = async () => {
+    const next = async () => {
+      if (flipping) return;
+      if (current >= 0) toTray(current);
+      if (current === cards.length - 1) return finish();
+      flipping = true;
+      current++;
+      const el = els[current], c = cards[current];
+      label.hidden = true;
+      el.classList.add('top');
+      // Suspense : les grosses cartes s'illuminent avant d'être retournées.
+      if (c.tier >= 3) {
+        el.classList.add('charging');
+        await sleep(c.tier >= 5 ? 1300 : c.tier >= 4 ? 950 : 600);
+      }
+      el.classList.add('flipped');
+      if (c.tier >= 4) setTimeout(() => confetti(el, game.color), 280);
+      if (c.tier >= 5) setTimeout(() => stage.closest('.open').classList.add('quake'), 200);
+      setTimeout(() => stage.closest('.open')?.classList.remove('quake'), 900);
+      await sleep(420);
+      label.innerHTML = `<span>${esc(RARITY_LABEL(c.rarity))}</span><b>${fmt(c.price)}</b>${fresh.has(c.id) ? '<em>Nouvelle carte</em>' : ''}`;
+      label.className = `scard-label tier-${c.tier}`;
+      label.hidden = false;
+      counter.textContent = `${current + 1} / ${cards.length}`;
+      flipping = false;
+    };
+
+    stack.addEventListener('click', next);
+    stage.querySelector('[data-next]').addEventListener('click', next);
+    stage.querySelector('[data-all]').addEventListener('click', () => finish());
+    tray.addEventListener('click', e => {
+      const b = e.target.closest('[data-i]'); if (!b) return;
+      const c = cards[+b.dataset.i];
+      openModal(c, game, owned(setKey)[c.id]);
+    });
+    stage.revealNext = next;
+
+    // ---------- 4. Récapitulatif ----------
+    const finish = () => {
       stage.revealNext = null;
       const total = cards.reduce((s, c) => s + (c.price ?? 0), 0);
       const best = cards.reduce((a, b) => ((b.price ?? 0) > (a.price ?? 0) ? b : a));
       const left = packsLeft(game.id);
-      stage.querySelector('.reveal-bar').innerHTML = `
-        <div class="summary">
-          <div><span class="muted">Valeur du booster</span><b>${fmt(total)}</b></div>
-          <div><span class="muted">Meilleure carte</span><b>${esc(best.name)} · ${fmt(best.price)}</b></div>
-          <div><span class="muted">Nouvelles cartes</span><b>${fresh.size}</b></div>
-        </div>
-        <div class="row">
-          ${left > 0 ? `<button class="btn primary" data-again>Booster suivant (${left} restant${left > 1 ? 's' : ''})</button>` : `<span class="muted">Plus de boosters ${esc(game.name)} aujourd'hui.</span>`}
-          <a class="btn ghost" href="#/collection/${setKey}">Voir la collection</a>
+      stage.innerHTML = `
+        <div class="reveal">
+          <div class="cards">
+            ${cards.map((c, i) => `
+              <div class="flip open tier-${c.tier}" style="--i:${i}" data-i="${i}">
+                <div class="flip-inner">
+                  <div class="face face-back"></div>
+                  <div class="face front tilt"><img src="${c.img}" alt="${esc(c.name)}"><div class="shine"></div>
+                    ${fresh.has(c.id) ? '<span class="new">NOUVEAU</span>' : ''}</div>
+                </div>
+                <div class="flip-label"><span>${esc(RARITY_LABEL(c.rarity))}</span><b>${fmt(c.price)}</b></div>
+              </div>`).join('')}
+          </div>
+          <div class="reveal-bar">
+            <div class="summary">
+              <div><span class="muted">Valeur du booster</span><b>${fmt(total)}</b></div>
+              <div><span class="muted">Meilleure carte</span><b>${esc(best.name)} · ${fmt(best.price)}</b></div>
+              <div><span class="muted">Nouvelles cartes</span><b>${fresh.size}</b></div>
+            </div>
+            <div class="row">
+              ${left > 0 ? `<button class="btn primary" data-again>Booster suivant (${left} restant${left > 1 ? 's' : ''})</button>` : `<span class="muted">Plus de boosters ${esc(game.name)} aujourd'hui.</span>`}
+              <a class="btn ghost" href="#/collection/${setKey}">Voir la collection</a>
+            </div>
+          </div>
         </div>`;
+      stage.querySelectorAll('.flip').forEach(el => {
+        bindTilt(el.querySelector('.tilt'));
+        el.addEventListener('click', () => openModal(cards[+el.dataset.i], game, owned(setKey)[cards[+el.dataset.i].id]));
+      });
       stage.querySelector('[data-again]')?.addEventListener('click', showPack);
       refreshTotal();
     };

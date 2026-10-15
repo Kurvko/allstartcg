@@ -14,44 +14,79 @@ export const USD_TO_EUR = 0.92;
 
 const C = (n, rarity) => Array.from({ length: n }, () => [[rarity, 1]]);
 
+// ---------- Taux de drop ----------
+// Poids = pourcentage par booster pour l'emplacement concerné (sources : études de pulls TCGplayer,
+// Elite Fourum, Card Shop Live ; chiffres officiels Riftbound et Wizards ; voir README).
+// Une rareté absente d'un set est ignorée et les poids restants sont renormalisés.
+
 // ---------- Pokémon : sets générés (npm run discover), composition selon l'époque ----------
 
-// rareté -> [niveau, poids dans l'emplacement « rare »]
-const PK_RARITIES = {
-  None: [0, 0], Common: [0, 0], Uncommon: [1, 0],
-  Rare: [2, 60], 'Rare Holo': [3, 22], 'Holo Rare': [3, 22],
-  'Holo Rare V': [3, 12], 'Double rare': [3, 14], 'ACE SPEC Rare': [3, 5],
-  'Rare Holo LV.X': [4, 6], 'Rare PRIME': [4, 6], LEGEND: [4, 3],
-  'Holo Rare VMAX': [4, 5], 'Holo Rare VSTAR': [4, 5], 'Ultra Rare': [4, 5], 'Full Art Trainer': [4, 3],
-  'Amazing Rare': [4, 4], 'Radiant Rare': [4, 4], 'Shiny rare': [4, 10], 'Shiny rare V': [4, 4],
-  'Illustration rare': [4, 8], 'Classic Collection': [4, 8],
-  'Shiny rare VMAX': [5, 1.5], 'Shiny Ultra Rare': [5, 1.5], 'Secret Rare': [5, 1.5],
-  'Special illustration rare': [5, 1.8], 'Hyper rare': [5, 0.8], 'Black White Rare': [5, 1], 'Mega Hyper Rare': [5, 0.3],
-  // Libellés renvoyés par TCGdex en français
-  Commune: [0, 0], 'Peu Commune': [1, 0], 'Rare Prime': [4, 6], 'LÉGENDE': [4, 3],
-  'Magnifique rare': [5, 1.5], Magnifique: [4, 4], 'Radieux Rare': [4, 4], 'HIGH-TECH rare': [3, 5],
-  'Illustration spéciale rare': [5, 1.8], 'Chromatique ultra rare': [5, 1.5], 'Rare Noir Blanc': [5, 1],
-  'Méga Hyper Rare': [5, 0.3], 'Mega Attack Rare': [4, 3], 'Pikachu Rare': [4, 6], 'Futuristic Rare': [5, 0.8], 'RGB Rare': [5, 0.8],
+// Niveau visuel (0..5) des raretés TCGdex, libellés anglais et français.
+const PK_TIERS = {
+  None: 0, Common: 0, Commune: 0, Uncommon: 1, 'Peu Commune': 1,
+  Rare: 2, 'Rare Holo': 3, 'Holo Rare': 3, 'Holo Rare V': 3, 'Double rare': 3, 'HIGH-TECH rare': 3, 'ACE SPEC Rare': 3,
+  'Rare Holo LV.X': 4, 'Rare Prime': 4, 'Rare PRIME': 4, 'LÉGENDE': 4, LEGEND: 4, 'Holo Rare VMAX': 4, 'Holo Rare VSTAR': 4,
+  'Ultra Rare': 4, Magnifique: 4, 'Radieux Rare': 4, 'Shiny rare': 4, 'Illustration rare': 4, 'Mega Attack Rare': 4, 'Pikachu Rare': 4,
+  'Magnifique rare': 5, 'Illustration spéciale rare': 5, 'Chromatique ultra rare': 5, 'Hyper rare': 5, 'Rare Noir Blanc': 5,
+  'Méga Hyper Rare': 5, 'Futuristic Rare': 5, 'RGB Rare': 5,
 };
-const PK_TIERS = Object.fromEntries(Object.entries(PK_RARITIES).map(([r, [tier]]) => [r, tier]));
-const PK_HIT = Object.entries(PK_RARITIES).filter(([, [, w]]) => w > 0).map(([r, [, w]]) => [r, w]);
-const PK_REVERSE = [['Commune', 50], ['Peu Commune', 35], ['Common', 50], ['Uncommon', 35], ['Rare', 12], ['Rare Holo', 3], ['Holo Rare', 3]];
-// Une commune/peu commune manquante (sets spéciaux) bascule sur la rareté suivante.
 const PK_C = [['Commune', 100], ['Common', 100], ['Peu Commune', 1], ['Rare', 0.1]];
 const PK_U = [['Peu Commune', 100], ['Uncommon', 100], ['Commune', 1], ['Rare', 0.1]];
-const pkSlots = (c, u, rev) => [
-  ...Array.from({ length: c }, () => PK_C), ...Array.from({ length: u }, () => PK_U),
-  ...Array.from({ length: rev }, () => PK_REVERSE), PK_HIT,
+const PK_REVERSE = [['Commune', 50], ['Peu Commune', 35], ['Rare', 15], ['Rare Holo', 3], ['Holo Rare', 3]];
+const rep = (n, slot) => Array.from({ length: n }, () => slot);
+
+// Emplacement « rare » par époque : le reste du pourcentage va à la rare simple.
+const PK_RARE = {
+  wotc: [['Rare', 66.7], ['Rare Holo', 33.3]],
+  ecard: [['Rare', 65], ['Holo Rare', 33], ['Rare Holo', 2]],
+  ex: [['Rare', 64], ['Rare Holo', 36]],
+  exOld: [['Rare', 64], ['Holo Rare', 28], ['Rare Holo', 8]], // EX Rubis & Saphir → Légendes Oubliées : « Rare Holo » = cartes ex
+  dp: [['Rare', 62], ['Rare Holo', 33], ['Rare Holo LV.X', 4]],
+  pl: [['Rare', 59], ['Holo Rare', 33], ['Rare Holo LV.X', 5], ['Rare Holo', 3]],
+  hgss: [['Rare', 50], ['Holo Rare', 28], ['Rare Prime', 14], ['LÉGENDE', 6], ['Rare Holo', 2.8], ['Ultra Rare', 0.9]],
+  col: [['Rare', 67], ['Holo Rare', 33]],
+  bw: [['Rare', 95.8], ['Ultra Rare', 2.8], ['Magnifique rare', 1.4]], // EX et holos rangés dans « Rare » par TCGdex
+  xy: [['Rare', 79.6], ['Ultra Rare', 19], ['Magnifique rare', 1.4]], // Ultra Rare = EX + full art
+  sm: [['Rare', 80.3], ['Ultra Rare', 15.4], ['Magnifique rare', 2.3], ['Rare Holo', 2]], // Ultra Rare = GX + full art
+  swsh: [
+    ['Rare', 42], ['Holo Rare', 22], ['Holo Rare V', 14.3], ['Holo Rare VMAX', 5.6], ['Holo Rare VSTAR', 5.6],
+    ['Magnifique', 5.7], ['Radieux Rare', 4.7], ['Ultra Rare', 3.9], ['Magnifique rare', 2], ['Rare Holo', 1],
+  ],
+  sv: [['Rare', 76.6], ['Double rare', 14], ['Ultra Rare', 6.7], ['Hyper rare', 1.85], ['Rare Noir Blanc', 0.5], ['Mega Attack Rare', 0]],
+  me: [['Rare', 67.5], ['Double rare', 20.3], ['Ultra Rare', 8.3], ['Mega Attack Rare', 3.4], ['Méga Hyper Rare', 0.1]],
+};
+// Écarlate et Violet / Méga-Évolution : 2ᵉ reverse pouvant devenir Illustration rare ou Illustration spéciale rare.
+const PK_SV_HIT2 = [
+  ['Commune', 42], ['Peu Commune', 30], ['Rare', 12], ['HIGH-TECH rare', 4],
+  ['Illustration rare', 8], ['Illustration spéciale rare', 2.5],
+  ['Shiny rare', 25], ['Chromatique ultra rare', 7.7], // Destinées de Paldea
+  ['Pikachu Rare', 8], ['RGB Rare', 0.8], ['Futuristic Rare', 0.5], // 30ᵉ Anniversaire (estimation)
 ];
-// époque -> composition et prix indicatif du booster scellé
+const PK_ME_HIT2 = PK_SV_HIT2.map(([r, w]) => [r, r === 'Illustration spéciale rare' ? 1.1 : r === 'Illustration rare' ? 10.7 : w]);
+
 const PK_ERAS = {
-  base: { slots: pkSlots(7, 3, 0), price: 120 }, neo: { slots: pkSlots(7, 3, 0), price: 150 },
-  ecard: { slots: pkSlots(5, 2, 1), price: 150 }, ex: { slots: pkSlots(5, 3, 1), price: 60 },
-  dp: { slots: pkSlots(5, 3, 1), price: 40 }, pl: { slots: pkSlots(5, 3, 1), price: 40 },
-  hgss: { slots: pkSlots(5, 3, 1), price: 30 }, col: { slots: pkSlots(5, 3, 1), price: 30 },
-  bw: { slots: pkSlots(6, 3, 1), price: 10 }, xy: { slots: pkSlots(6, 3, 1), price: 7 },
-  sm: { slots: pkSlots(6, 3, 1), price: 6 }, swsh: { slots: pkSlots(6, 3, 1), price: 5 },
-  sv: { slots: pkSlots(4, 3, 2), price: 6 }, me: { slots: pkSlots(4, 3, 2), price: 6 },
+  base: { slots: [...rep(7, PK_C), ...rep(3, PK_U), PK_RARE.wotc], price: 120 },
+  neo: { slots: [...rep(7, PK_C), ...rep(3, PK_U), PK_RARE.wotc], price: 150 },
+  ecard: { slots: [...rep(5, PK_C), ...rep(2, PK_U), PK_REVERSE, PK_RARE.ecard], price: 150 },
+  ex: { slots: [...rep(5, PK_C), ...rep(2, PK_U), PK_REVERSE, PK_RARE.ex], price: 60 },
+  dp: { slots: [...rep(5, PK_C), ...rep(3, PK_U), PK_REVERSE, PK_RARE.dp], price: 40 },
+  pl: { slots: [...rep(5, PK_C), ...rep(3, PK_U), PK_REVERSE, PK_RARE.pl], price: 40 },
+  hgss: { slots: [...rep(5, PK_C), ...rep(3, PK_U), PK_REVERSE, PK_RARE.hgss], price: 30 },
+  col: { slots: [...rep(5, PK_C), ...rep(3, PK_U), PK_REVERSE, PK_RARE.col], price: 30 },
+  bw: { slots: [...rep(5, PK_C), ...rep(3, PK_U), PK_REVERSE, PK_RARE.bw], price: 10 },
+  xy: { slots: [...rep(5, PK_C), ...rep(3, PK_U), PK_REVERSE, PK_RARE.xy], price: 7 },
+  sm: { slots: [...rep(5, PK_C), ...rep(3, PK_U), PK_REVERSE, PK_RARE.sm], price: 6 },
+  swsh: { slots: [...rep(5, PK_C), ...rep(3, PK_U), PK_REVERSE, PK_RARE.swsh], price: 5 },
+  sv: { slots: [...rep(4, PK_C), ...rep(3, PK_U), PK_REVERSE, PK_SV_HIT2, PK_RARE.sv], price: 6 },
+  me: { slots: [...rep(4, PK_C), ...rep(3, PK_U), PK_REVERSE, PK_ME_HIT2, PK_RARE.me], price: 6 },
+};
+// Sets dont les taux s'écartent de leur époque.
+const PK_SET_SLOTS = {
+  ...Object.fromEntries(['ex1', 'ex2', 'ex3', 'ex4', 'ex5'].map(id => [id, [...rep(5, PK_C), ...rep(2, PK_U), PK_REVERSE, PK_RARE.exOld]])),
+  // Évolutions Prismatiques : pas d'Illustration rare, SIR 1/45, Hyper rare 1/152.
+  'sv08.5': [...rep(4, PK_C), ...rep(3, PK_U), PK_REVERSE,
+    [['Commune', 50], ['Peu Commune', 33], ['Rare', 10], ['HIGH-TECH rare', 3.4], ['Illustration spéciale rare', 2.2]],
+    [['Rare', 78.3], ['Double rare', 15], ['Ultra Rare', 6], ['Hyper rare', 0.66]]],
 };
 const PK_PRICE_OVERRIDE = { base1: 300 };
 
@@ -59,18 +94,19 @@ function pokemonSet(s) {
   const era = PK_ERAS[s.serie] ?? PK_ERAS.sv;
   return {
     id: s.id, name: s.name, year: +s.date.slice(0, 4), group: s.serieName, source: 'tcgdex', lang: 'fr', serie: s.serie,
-    packPrice: PK_PRICE_OVERRIDE[s.id] ?? era.price, tiers: PK_TIERS, slots: era.slots,
+    packPrice: PK_PRICE_OVERRIDE[s.id] ?? era.price, tiers: PK_TIERS, slots: PK_SET_SLOTS[s.id] ?? era.slots,
   };
 }
 
-// Une rareté absente d'un set est ignorée et les poids restants sont renormalisés.
+// ---------- Yu-Gi-Oh! : 9 cartes = 8 communes + 1 rare ou mieux ----------
+// Short Prints ≈ 1/3 de la fréquence d'une commune, Super Short Prints ≈ 1/6.
 const YGO_TIERS = { Common: 0, 'Short Print': 0, 'Super Short Print': 1, Rare: 2, 'Super Rare': 3, 'Ultra Rare': 4, 'Secret Rare': 5 };
 const YGO_SLOTS = [
-  ...Array.from({ length: 8 }, () => [['Common', 85], ['Short Print', 12], ['Super Short Print', 3]]),
-  [['Rare', 70], ['Super Rare', 17], ['Ultra Rare', 9], ['Secret Rare', 4]],
+  ...rep(8, [['Common', 93], ['Short Print', 6.5], ['Super Short Print', 0.5]]),
+  [['Rare', 72], ['Super Rare', 16.7], ['Ultra Rare', 8.3], ['Secret Rare', 3]],
 ];
 
-// One Piece (TCGCSV) : les versions alternatives sont dans le nom de la carte.
+// ---------- One Piece : 12 cartes, une Rare ou mieux garantie, Leader 1 booster sur 2 ----------
 const OP_VARIANTS = [
   [/\((Dash Pack|Double Pack Set[^)]*|Pre-Release|Release Event)\)/i, 'Promo'], // hors booster
   [/\((Manga|Gold|Super Alternate Art|Super Leader Alternate Art|Special Foil)\)/i, 'Manga'],
@@ -80,35 +116,38 @@ const OP_VARIANTS = [
 ];
 const OP_TIERS = { C: 0, UC: 1, Foil: 2, R: 2, L: 2, SR: 3, AA: 4, SEC: 5, SP: 5, TR: 5, Manga: 5 };
 const OP_SLOTS = [
-  ...Array.from({ length: 7 }, () => [['C', 100], ['UC', 1]]),
-  ...Array.from({ length: 3 }, () => [['UC', 100], ['C', 1]]), // les Extra Boosters n'ont pas de peu communes
-  [['C', 45], ['L', 25], ['R', 15], ['Foil', 30]],
-  [['R', 70], ['SR', 18], ['AA', 7], ['SEC', 2.5], ['SP', 1.5], ['TR', 0.6], ['Manga', 0.4]],
+  ...rep(6, [['C', 100], ['UC', 1]]),
+  ...rep(3, [['UC', 100], ['C', 1]]), // les Extra Boosters n'ont pas de peu communes
+  [['C', 50], ['L', 50]],
+  [['R', 100]],
+  // SR 1/3, Alt Art 1/12, SEC 1/50, SP 1/160, Treasure Rare 1/288, Manga ≈ 1/700
+  [['R', 58.6], ['SR', 30], ['AA', 8.3], ['SEC', 2], ['SP', 0.6], ['TR', 0.35], ['Manga', 0.15]],
 ];
-// Premium Boosters (PRB) : rééditions, plusieurs foils par booster, cartes Gold/Manga en chase.
+// Premium Boosters (PRB) : 10 cartes, rééditions, au moins un foil ou une parallèle par booster.
 const PRB_SLOTS = [
-  ...Array.from({ length: 6 }, () => [['C', 20], ['UC', 40], ['R', 40]]),
-  ...Array.from({ length: 3 }, () => [['Foil', 75], ['SR', 25]]),
-  [['SR', 60], ['AA', 30], ['SEC', 5], ['SP', 2.5], ['Manga', 2.5]],
+  ...rep(6, [['C', 20], ['UC', 40], ['R', 40]]),
+  ...rep(3, [['Foil', 85], ['SR', 15]]),
+  [['SR', 55], ['AA', 35], ['SEC', 6], ['SP', 2], ['Manga', 2]],
 ];
 
+// ---------- Dragon Ball Super Fusion World : 12 cartes, une Rare ou mieux garantie ----------
 const DBFW_VARIANTS = [[/\(Super Alternate Art\)/i, 'Super Alt Art'], [/\(Alternate Art\)/i, 'Alt Art']];
-const DBFW_TIERS ={ Common: 0, Uncommon: 1, Leader: 2, Rare: 2, 'Super Rare': 3, 'Alt Art': 4, 'Secret Rare': 5, 'Super Alt Art': 5 };
+const DBFW_TIERS = { Common: 0, Uncommon: 1, Leader: 2, Rare: 2, 'Super Rare': 3, 'Alt Art': 4, 'Secret Rare': 5, 'Super Alt Art': 5 };
 const DBFW_SLOTS = [
   ...C(7, 'Common'), ...C(3, 'Uncommon'),
-  [['Common', 55], ['Leader', 45]],
-  [['Rare', 72], ['Super Rare', 18], ['Alt Art', 7], ['Secret Rare', 2.5], ['Super Alt Art', 0.5]],
+  [['Common', 67], ['Leader', 33]], // environ un Leader de chaque par boîte
+  [['Rare', 67.7], ['Super Rare', 23], ['Alt Art', 6], ['Secret Rare', 3], ['Super Alt Art', 0.3]],
 ];
 
-// Riftbound : 7 communes, 3 peu communes, 2 rares ou épiques, 1 emplacement foil
-// (Showcase ≈ 1 booster sur 12, Signature ≈ 1 sur 200).
+// ---------- Riftbound (chiffres officiels Riot) ----------
+// 7 communes, 3 peu communes, 2 rares (Épique 1 booster sur 4), 1 foil (Showcase ≈ 1/12, Signature 1/720).
 const RIFT_VARIANTS = [[/\(Signature\)/i, 'Signature']];
-const RIFT_TIERS ={ Common: 0, Uncommon: 1, Rare: 2, Epic: 3, Showcase: 4, Signature: 5 };
+const RIFT_TIERS = { Common: 0, Uncommon: 1, Rare: 2, Epic: 3, Showcase: 4, Signature: 5 };
 const RIFT_SLOTS = [
   ...C(7, 'Common'), ...C(3, 'Uncommon'),
-  [['Rare', 80], ['Epic', 20]],
-  [['Rare', 80], ['Epic', 20]],
-  [['Common', 45], ['Uncommon', 25], ['Rare', 15], ['Epic', 7], ['Showcase', 7.5], ['Signature', 0.5]],
+  [['Rare', 87.5], ['Epic', 12.5]],
+  [['Rare', 87.5], ['Epic', 12.5]],
+  [['Common', 57], ['Uncommon', 28], ['Rare', 3.7], ['Epic', 1.5], ['Showcase', 9.7], ['Signature', 0.14]],
 ];
 
 export const GAMES = [
@@ -133,10 +172,12 @@ export const GAMES = [
       {
         id: 'blb', packPrice: 6, name: 'Bloomburrow', year: 2024, source: 'scryfall',
         tiers: { common: 0, uncommon: 1, rare: 3, mythic: 5 },
+        // Play Booster : 6 communes, 3 peu communes, 1 joker, 1 rare/mythique (mythique ≈ 1/7.5), 1 foil de n'importe quelle rareté.
         slots: [
-          ...C(7, 'common'), ...C(3, 'uncommon'),
-          [['common', 40], ['uncommon', 40], ['rare', 15], ['mythic', 5]],
-          [['rare', 6], ['mythic', 1]],
+          ...C(6, 'common'), ...C(3, 'uncommon'),
+          [['common', 42], ['uncommon', 40], ['rare', 15], ['mythic', 3]],
+          [['rare', 86.5], ['mythic', 13.5]],
+          [['common', 70], ['uncommon', 23], ['rare', 6], ['mythic', 1]],
         ],
       },
     ],
@@ -168,11 +209,12 @@ export const GAMES = [
       {
         id: '1', packPrice: 12, name: 'The First Chapter', year: 2023, source: 'lorcast',
         tiers: { Common: 0, Uncommon: 1, Rare: 2, Super_rare: 3, Legendary: 4, Enchanted: 5 },
+        // 6 communes, 3 peu communes, 2 rares ou mieux (Super Rare ≈ 1/3,4, Légendaire ≈ 1/8 par booster), 1 foil (Enchanted ≈ 1/96).
         slots: [
           ...C(6, 'Common'), ...C(3, 'Uncommon'),
-          [['Rare', 68], ['Super_rare', 24], ['Legendary', 8]],
-          [['Rare', 68], ['Super_rare', 24], ['Legendary', 8]],
-          [['Common', 50], ['Uncommon', 30], ['Rare', 12], ['Super_rare', 5], ['Legendary', 2], ['Enchanted', 1]],
+          [['Rare', 78.5], ['Super_rare', 15], ['Legendary', 6.5]],
+          [['Rare', 78.5], ['Super_rare', 15], ['Legendary', 6.5]],
+          [['Common', 55], ['Uncommon', 28], ['Rare', 10], ['Super_rare', 4], ['Legendary', 2], ['Enchanted', 1]],
         ],
       },
     ],
@@ -232,7 +274,8 @@ export const GAMES = [
       {
         id: 'B01', packPrice: 15, name: 'Masters – Galactic Battle', year: 2017, source: 'tcgcsv', category: 27, tcgGroup: 1962,
         tiers: { Common: 0, Uncommon: 1, Rare: 2, 'Super Rare': 3, 'Special Rare': 5 },
-        slots: [...C(8, 'Common'), ...C(3, 'Uncommon'), [['Rare', 70], ['Super Rare', 25], ['Special Rare', 5]]],
+        // 12 cartes : 8 communes, 3 peu communes, 1 Rare ou mieux (par boîte ≈ 12 R, 8 SR, 4 SPR).
+        slots: [...C(8, 'Common'), ...C(3, 'Uncommon'), [['Rare', 50], ['Super Rare', 33.3], ['Special Rare', 16.7]]],
       },
     ],
   },

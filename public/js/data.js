@@ -11,6 +11,11 @@ export function loadIndex() {
   return indexPromise;
 }
 
+/** Visuels des boosters : { "pokemon/base1": ["packs/pokemon/base1-0.webp", …] } */
+export function loadPacks() {
+  return fetch('data/packs.json').then(r => (r.ok ? r.json() : {})).catch(() => ({}));
+}
+
 export async function loadSet(setKey) {
   if (!cache.has(setKey)) {
     cache.set(setKey, fetch(`data/${setKey}.json`).then(r => {
