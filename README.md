@@ -2,6 +2,8 @@
 
 Ouvre gratuitement des boosters de tous les TCG, collectionne, et regarde ta collection prendre de la valeur au prix réel du marché. Pas d'achat, jamais.
 
+**En ligne :** https://kurvko.github.io/allstartcg/ (mis à jour automatiquement à chaque push sur `main`).
+
 ## Lancer le site
 
 ```
