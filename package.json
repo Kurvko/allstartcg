@@ -1,0 +1,12 @@
+{
+  "name": "allstartcg",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Simulateur d'ouverture de boosters de tous les TCG — gratuit, sans achat.",
+  "scripts": {
+    "start": "node server.mjs",
+    "fetch": "node scripts/fetch-data.mjs",
+    "discover": "node scripts/discover-sets.mjs"
+  }
+}

@@ -1,0 +1,541 @@
+import { GAMES, DAILY_PACKS, findSet } from './catalog.js';
+import { loadIndex, loadSet, openPack, collectionSummary } from './data.js';
+import { getState, packsLeft, owned, recordPack, recordValue, resetAll } from './store.js';
+
+const app = document.getElementById('app');
+const modal = document.getElementById('modal');
+
+// ---------- Utilitaires ----------
+
+const euro = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
+const fmt = v => (v == null ? '—' : euro.format(v));
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
+const RARITY_LABEL = r => r.replace(/_/g, ' ');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function untilMidnight() {
+  const now = new Date();
+  const ms = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1) - now;
+  const h = Math.floor(ms / 3.6e6), m = Math.floor(ms / 6e4) % 60, s = Math.floor(ms / 1000) % 60;
+  return `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+}
+
+function preload(urls, timeout = 5000) {
+  return Promise.race([
+    Promise.all(urls.map(src => new Promise(done => { const img = new Image(); img.onload = img.onerror = done; img.src = src; }))),
+    sleep(timeout),
+  ]);
+}
+
+const chaseCard = data => data.cards.reduce((a, b) => ((b.price ?? 0) > (a.price ?? 0) ? b : a));
+
+async function refreshTotal() {
+  const { value } = await collectionSummary();
+  recordValue(value);
+  document.getElementById('total-value').textContent = fmt(value);
+  return value;
+}
+
+// ---------- Composants ----------
+
+function packHtml(game, set, art, { big = false } = {}) {
+  return `
+    <div class="pack ${big ? 'pack-big' : ''}" style="--c:${game.color};--a:${game.accent}">
+      <div class="pack-cut"><div class="crimp"></div></div>
+      <div class="pack-body">
+        <div class="pack-game">${esc(game.short ?? game.name)}</div>
+        <div class="pack-art">${art ? `<img src="${art}" alt="" loading="lazy">` : ''}</div>
+        <div class="pack-set">${esc(set.name)}</div>
+        <div class="pack-meta">${set.slots.length} cartes · ${set.year}</div>
+      </div>
+      <div class="crimp crimp-bottom"></div>
+    </div>`;
+}
+
+function dots(gameId) {
+  const left = packsLeft(gameId);
+  return `<span class="dots" title="${left} booster(s) restant(s) aujourd'hui">${
+    Array.from({ length: DAILY_PACKS }, (_, i) => `<i class="${i < left ? 'on' : ''}"></i>`).join('')
+  }</span>`;
+}
+
+function cardThumb(card, count, { missing = false } = {}) {
+  return `
+    <button class="thumb tier-${card.tier} ${missing ? 'missing' : ''}" data-card="${esc(card.id)}">
+      <img src="${card.img}" alt="${esc(card.name)}" loading="lazy">
+      ${count > 1 ? `<span class="count">×${count}</span>` : ''}
+      <span class="thumb-info"><span>${esc(card.name)}</span><b>${fmt(card.price)}</b></span>
+    </button>`;
+}
+
+function openModal(card, game, count) {
+  modal.innerHTML = `
+    <div class="modal-inner" style="--c:${game.color}">
+      <div class="tilt tier-${card.tier}"><img src="${card.imgHi}" alt="${esc(card.name)}"><div class="shine"></div></div>
+      <div class="modal-info">
+        <h2>${esc(card.name)}</h2>
+        <p class="muted">${esc(RARITY_LABEL(card.rarity))} · n° ${esc(card.num)}</p>
+        <p class="modal-price">${fmt(card.price)}</p>
+        <p class="muted">${count ? `Tu en possèdes ${count}` : 'Pas encore dans ta collection'}</p>
+        <button class="btn ghost" data-close>Fermer</button>
+      </div>
+    </div>`;
+  modal.hidden = false;
+  bindTilt(modal.querySelector('.tilt'));
+}
+
+modal.addEventListener('click', e => {
+  if (e.target === modal || e.target.closest('[data-close]')) modal.hidden = true;
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') modal.hidden = true; });
+
+function bindTilt(el) {
+  el.addEventListener('pointermove', e => {
+    const r = el.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+    el.style.setProperty('--rx', `${(0.5 - y) * 16}deg`);
+    el.style.setProperty('--ry', `${(x - 0.5) * 18}deg`);
+    el.style.setProperty('--mx', `${x * 100}%`);
+    el.style.setProperty('--my', `${y * 100}%`);
+  });
+  el.addEventListener('pointerleave', () => { el.style.setProperty('--rx', '0deg'); el.style.setProperty('--ry', '0deg'); });
+}
+
+function confetti(origin, color) {
+  const r = origin.getBoundingClientRect();
+  for (let i = 0; i < 40; i++) {
+    const p = document.createElement('i');
+    p.className = 'confetti';
+    p.style.left = `${r.left + r.width / 2}px`;
+    p.style.top = `${r.top + r.height / 2}px`;
+    p.style.background = i % 3 ? color : `hsl(${Math.random() * 360} 90% 65%)`;
+    p.style.setProperty('--dx', `${(Math.random() - 0.5) * 520}px`);
+    p.style.setProperty('--dy', `${(Math.random() - 0.8) * 420}px`);
+    p.style.setProperty('--rot', `${Math.random() * 720}deg`);
+    document.body.append(p);
+    setTimeout(() => p.remove(), 1400);
+  }
+}
+
+// ---------- Vues ----------
+
+async function viewHome() {
+  const { rows, value } = await collectionSummary();
+  const byKey = Object.fromEntries(rows.map(r => [r.key, r]));
+  const leftToday = GAMES.reduce((s, g) => s + packsLeft(g.id), 0);
+
+  app.innerHTML = `
+    <section class="hero">
+      <h1>Ouvre des boosters.<br><em>Sans dépenser un centime.</em></h1>
+      <p>${DAILY_PACKS} boosters gratuits par jeu et par jour. Collectionne, complète tes sets, et regarde ta collection prendre de la valeur au prix réel du marché.</p>
+      <div class="hero-stats">
+        <div><b>${leftToday}</b><span>boosters dispo aujourd'hui</span></div>
+        <div><b>${fmt(value)}</b><span>valeur de ta collection</span></div>
+        <div><b class="countdown">${untilMidnight()}</b><span>avant les nouveaux boosters</span></div>
+      </div>
+    </section>
+    ${GAMES.map(game => {
+      const sets = newestFirst(game.sets);
+      const shown = sets.slice(0, HOME_SETS);
+      return `
+      <section class="game" style="--c:${game.color};--a:${game.accent}">
+        <div class="game-head">
+          <h2><a href="#/game/${game.id}">${esc(game.name)}</a></h2>
+          ${dots(game.id)}
+          <span class="muted">${packsLeft(game.id)} / ${DAILY_PACKS} aujourd'hui</span>
+          <a class="see-all" href="#/game/${game.id}">${sets.length} set${sets.length > 1 ? 's' : ''} →</a>
+        </div>
+        <div class="set-row">
+          ${shown.map(set => setTile(game, set, byKey[`${game.id}/${set.id}`])).join('')}
+          ${sets.length > shown.length ? `
+            <a class="set-tile more-tile" href="#/game/${game.id}">
+              <span>+${sets.length - shown.length}</span><small>Voir tous les sets ${esc(game.short ?? game.name)}</small>
+            </a>` : ''}
+        </div>
+      </section>`;
+    }).join('')}`;
+}
+
+const HOME_SETS = 5;
+// Les catalogues sont chronologiques : on inverse puis on trie par année (tri stable).
+const newestFirst = sets => [...sets].reverse().sort((a, b) => b.year - a.year);
+
+function setTile(game, set, row) {
+  if (row.missing) {
+    return `<div class="set-tile disabled">${packHtml(game, set, '')}<p class="muted">Données absentes — lance <code>npm run fetch</code></p></div>`;
+  }
+  const pct = Math.round((row.unique / row.total) * 100);
+  return `
+    <a class="set-tile" href="#/open/${row.key}" data-name="${esc(set.name.toLowerCase())}">
+      ${packHtml(game, set, row.meta.chase.img)}
+      <div class="progress"><i style="width:${pct}%"></i></div>
+      <div class="set-tile-info"><span>${row.unique}/${row.total} cartes</span><b>${fmt(row.value)}</b></div>
+    </a>`;
+}
+
+async function viewGame(gameId) {
+  const game = GAMES.find(g => g.id === gameId);
+  if (!game) return viewNotFound();
+  const { rows } = await collectionSummary();
+  const byKey = Object.fromEntries(rows.map(r => [r.key, r]));
+  const groups = new Map();
+  for (const set of newestFirst(game.sets)) {
+    const label = set.group ?? 'Sets';
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label).push(set);
+  }
+
+  app.innerHTML = `
+    <section class="page" style="--c:${game.color};--a:${game.accent}">
+      <a href="#/" class="back">← Tous les jeux</a>
+      <div class="page-head">
+        <div><h1>${esc(game.name)}</h1><p class="muted">${game.sets.length} sets · ${packsLeft(game.id)} / ${DAILY_PACKS} boosters restants aujourd'hui</p></div>
+        <input class="search" type="search" placeholder="Rechercher un set…" aria-label="Rechercher un set">
+      </div>
+      ${[...groups].map(([label, sets]) => `
+        <div class="set-group">
+          ${groups.size > 1 ? `<h2>${esc(label)} <span class="muted">${sets[sets.length - 1].year}–${sets[0].year}</span></h2>` : ''}
+          <div class="set-row">${sets.map(set => setTile(game, set, byKey[`${game.id}/${set.id}`])).join('')}</div>
+        </div>`).join('')}
+      <p class="muted no-result" hidden>Aucun set ne correspond.</p>
+    </section>`;
+
+  app.querySelector('.search').addEventListener('input', e => {
+    const q = e.target.value.trim().toLowerCase();
+    let any = false;
+    app.querySelectorAll('.set-group').forEach(g => {
+      let visible = 0;
+      g.querySelectorAll('.set-tile').forEach(t => {
+        const show = !q || (t.dataset.name ?? '').includes(q);
+        t.hidden = !show;
+        visible += show;
+      });
+      g.hidden = !visible;
+      any ||= visible > 0;
+    });
+    app.querySelector('.no-result').hidden = any;
+  });
+}
+
+async function viewOpen(setKey) {
+  const found = findSet(setKey);
+  if (!found) return viewNotFound();
+  const { game, set } = found;
+  const [data, index] = await Promise.all([loadSet(setKey), loadIndex()]);
+  const packArt = index[setKey]?.chase.img ?? chaseCard(data).img;
+
+  app.innerHTML = `
+    <section class="open" style="--c:${game.color};--a:${game.accent}">
+      <div class="open-head">
+        <a href="#/game/${game.id}" class="back">← ${esc(game.short ?? game.name)}</a>
+        <div><h1>${esc(set.name)}</h1><p class="muted">${esc(game.name)} · ${set.year} · ${data.cards.length} cartes · carte phare : ${esc(chaseCard(data).name)} (${fmt(chaseCard(data).price)})</p></div>
+        <div class="open-quota">${dots(game.id)}<span class="quota-text"></span></div>
+      </div>
+      <div class="stage"></div>
+    </section>`;
+
+  const stage = app.querySelector('.stage');
+  const quota = app.querySelector('.open-quota');
+
+  const updateQuota = () => {
+    quota.innerHTML = `${dots(game.id)}<span class="quota-text">${packsLeft(game.id)} / ${DAILY_PACKS} restants aujourd'hui</span>`;
+  };
+
+  const showPack = () => {
+    updateQuota();
+    const left = packsLeft(game.id);
+    stage.innerHTML = `
+      <div class="pack-stage">
+        ${packHtml(game, set, packArt, { big: true })}
+        ${left > 0
+          ? `<button class="btn primary" data-open>Ouvrir le booster</button><p class="muted hint">ou appuie sur Espace</p>`
+          : `<div class="limit">
+               <h3>C'est tout pour aujourd'hui 🌙</h3>
+               <p>Tes ${DAILY_PACKS} boosters ${esc(game.name)} du jour sont ouverts. Les prochains arrivent dans <b class="countdown">${untilMidnight()}</b>.</p>
+               <p class="muted">Tu peux encore ouvrir les boosters des autres jeux, ou admirer ta collection.</p>
+               <div class="row"><a class="btn" href="#/collection/${setKey}">Voir ma collection</a><a class="btn ghost" href="#/">Autres jeux</a></div>
+             </div>`}
+      </div>`;
+    stage.querySelector('[data-open]')?.addEventListener('click', tear);
+  };
+
+  let busy = false;
+  const tear = async () => {
+    if (busy || packsLeft(game.id) <= 0) return;
+    busy = true;
+    const cards = await openPack(setKey);
+    const fresh = recordPack(game.id, setKey, cards); // enregistré tout de suite : recharger la page ne relance pas le tirage
+    updateQuota();
+
+    const packEl = stage.querySelector('.pack');
+    stage.querySelector('[data-open]').disabled = true;
+    packEl.classList.add('shake');
+    await Promise.all([preload(cards.map(c => c.img)), sleep(700)]);
+    packEl.classList.add('torn');
+    await sleep(650);
+    busy = false;
+    showCards(cards, fresh);
+  };
+
+  const showCards = (cards, fresh) => {
+    stage.innerHTML = `
+      <div class="reveal">
+        <div class="cards">
+          ${cards.map((c, i) => `
+            <div class="flip tier-${c.tier}" style="--i:${i}" data-i="${i}">
+              <div class="flip-inner">
+                <div class="face face-back"><span>✦</span><small>${esc(game.name)}</small></div>
+                <div class="face front tilt"><img src="${c.img}" alt="${esc(c.name)}"><div class="shine"></div>
+                  ${fresh.has(c.id) ? '<span class="new">NOUVEAU</span>' : ''}
+                </div>
+              </div>
+              <div class="flip-label"><span>${esc(RARITY_LABEL(c.rarity))}</span><b>${fmt(c.price)}</b></div>
+            </div>`).join('')}
+        </div>
+        <div class="reveal-bar">
+          <button class="btn" data-all>Tout révéler</button>
+          <p class="muted hint">Clique sur les cartes · Espace pour la suivante</p>
+        </div>
+      </div>`;
+
+    const flips = [...stage.querySelectorAll('.flip')];
+    let revealed = 0;
+    const reveal = el => {
+      if (el.classList.contains('open')) {
+        openModal(cards[+el.dataset.i], game, owned(setKey)[cards[+el.dataset.i].id]);
+        return;
+      }
+      el.classList.add('open');
+      bindTilt(el.querySelector('.tilt'));
+      const card = cards[+el.dataset.i];
+      if (card.tier >= 4) setTimeout(() => confetti(el, game.color), 250);
+      if (++revealed === cards.length) finish();
+    };
+    flips.forEach(el => el.addEventListener('click', () => reveal(el)));
+    stage.querySelector('[data-all]').addEventListener('click', async () => {
+      for (const el of flips.filter(f => !f.classList.contains('open'))) { reveal(el); await sleep(110); }
+    });
+    stage.revealNext = () => { const next = flips.find(f => !f.classList.contains('open')); if (next) reveal(next); };
+
+    const finish = async () => {
+      stage.revealNext = null;
+      const total = cards.reduce((s, c) => s + (c.price ?? 0), 0);
+      const best = cards.reduce((a, b) => ((b.price ?? 0) > (a.price ?? 0) ? b : a));
+      const left = packsLeft(game.id);
+      stage.querySelector('.reveal-bar').innerHTML = `
+        <div class="summary">
+          <div><span class="muted">Valeur du booster</span><b>${fmt(total)}</b></div>
+          <div><span class="muted">Meilleure carte</span><b>${esc(best.name)} · ${fmt(best.price)}</b></div>
+          <div><span class="muted">Nouvelles cartes</span><b>${fresh.size}</b></div>
+        </div>
+        <div class="row">
+          ${left > 0 ? `<button class="btn primary" data-again>Booster suivant (${left} restant${left > 1 ? 's' : ''})</button>` : `<span class="muted">Plus de boosters ${esc(game.name)} aujourd'hui.</span>`}
+          <a class="btn ghost" href="#/collection/${setKey}">Voir la collection</a>
+        </div>`;
+      stage.querySelector('[data-again]')?.addEventListener('click', showPack);
+      refreshTotal();
+    };
+  };
+
+  stage.tear = tear;
+  showPack();
+}
+
+async function viewCollection() {
+  const { rows, value, count } = await collectionSummary();
+  app.innerHTML = `
+    <section class="page">
+      <h1>Ma collection</h1>
+      <p class="muted">${count} cartes · valeur totale <b class="accent">${fmt(value)}</b></p>
+      ${GAMES.map(game => {
+        const mine = rows.filter(r => r.game === game && r.unique > 0).sort((a, b) => b.value - a.value);
+        if (!mine.length) return '';
+        return `
+          <h2 style="color:${game.color}">${esc(game.name)}</h2>
+          <div class="binder-list">${mine.map(r => `
+            <a class="binder" href="#/collection/${r.key}" style="--c:${r.game.color};--a:${r.game.accent}">
+              <div class="binder-art"><img src="${r.meta.chase.img}" alt="" loading="lazy"></div>
+              <div class="binder-body">
+                <small>${r.set.year}</small>
+                <h3>${esc(r.set.name)}</h3>
+                <div class="progress"><i style="width:${Math.round((r.unique / r.total) * 100)}%"></i></div>
+                <div class="set-tile-info"><span>${r.unique}/${r.total} · ${r.count} cartes</span><b>${fmt(r.value)}</b></div>
+              </div>
+            </a>`).join('')}
+          </div>`;
+      }).join('') || '<p>Ta collection est vide. <a class="accent" href="#/">Ouvre ton premier booster →</a></p>'}
+    </section>`;
+}
+
+async function viewCollectionSet(setKey) {
+  const found = findSet(setKey);
+  if (!found) return viewNotFound();
+  const { game, set } = found;
+  const data = await loadSet(setKey);
+  const col = owned(setKey);
+  let filter = 'all', sort = 'num';
+
+  app.innerHTML = `
+    <section class="page" style="--c:${game.color};--a:${game.accent}">
+      <a href="#/collection" class="back">← Collection</a>
+      <div class="page-head">
+        <div><h1>${esc(set.name)}</h1><p class="muted summary-line"></p></div>
+        <a class="btn primary" href="#/open/${setKey}">Ouvrir un booster</a>
+      </div>
+      <div class="toolbar">
+        <div class="seg" data-filter>
+          <button data-v="all" class="on">Toutes</button><button data-v="owned">Possédées</button><button data-v="missing">Manquantes</button>
+        </div>
+        <select data-sort>
+          <option value="num">Numéro</option><option value="price">Prix ↓</option><option value="tier">Rareté ↓</option>
+        </select>
+      </div>
+      <div class="grid"></div>
+    </section>`;
+
+  const unique = Object.keys(col).filter(id => data.byId.has(id)).length;
+  const value = Object.entries(col).reduce((s, [id, n]) => s + (data.byId.get(id)?.price ?? 0) * n, 0);
+  app.querySelector('.summary-line').innerHTML =
+    `${esc(game.name)} · ${unique}/${data.cards.length} cartes (${Math.round((unique / data.cards.length) * 100)} %) · valeur <b class="accent">${fmt(value)}</b>`;
+
+  const grid = app.querySelector('.grid');
+  const draw = () => {
+    let cards = data.cards.slice();
+    if (filter === 'owned') cards = cards.filter(c => col[c.id]);
+    if (filter === 'missing') cards = cards.filter(c => !col[c.id]);
+    if (sort === 'price') cards.sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
+    if (sort === 'tier') cards.sort((a, b) => b.tier - a.tier || (b.price ?? 0) - (a.price ?? 0));
+    grid.innerHTML = cards.map(c => cardThumb(c, col[c.id] ?? 0, { missing: !col[c.id] })).join('') ||
+      '<p class="muted">Rien ici pour l\'instant.</p>';
+  };
+  app.querySelector('[data-filter]').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    filter = b.dataset.v;
+    app.querySelectorAll('[data-filter] button').forEach(x => x.classList.toggle('on', x === b));
+    draw();
+  });
+  app.querySelector('[data-sort]').addEventListener('change', e => { sort = e.target.value; draw(); });
+  grid.addEventListener('click', e => {
+    const b = e.target.closest('[data-card]'); if (!b) return;
+    openModal(data.byId.get(b.dataset.card), game, col[b.dataset.card]);
+  });
+  draw();
+}
+
+async function viewStats() {
+  const { rows, value, count } = await collectionSummary();
+  const state = getState();
+  const packs = Object.values(state.totalPacks).reduce((s, n) => s + n, 0);
+  const saved = Object.entries(state.totalPacks).reduce((s, [key, n]) => s + (findSet(key)?.set.packPrice ?? 0) * n, 0);
+  const hist = Object.entries(state.history).sort(([a], [b]) => a.localeCompare(b));
+
+  app.innerHTML = `
+    <section class="page">
+      <h1>Statistiques</h1>
+      <div class="kpis">
+        <div><span>Valeur de la collection</span><b class="accent">${fmt(value)}</b></div>
+        <div><span>Cartes</span><b>${count}</b></div>
+        <div><span>Boosters ouverts</span><b>${packs}</b></div>
+        <div title="Prix indicatif des boosters scellés que tu aurais dû acheter"><span>Argent économisé (estim.)</span><b class="good">${fmt(saved)}</b></div>
+      </div>
+      <h2>Évolution de la valeur</h2>
+      ${chart(hist)}
+      <h2>Meilleurs tirages</h2>
+      <div class="grid">
+        ${state.bestPulls.map(p => {
+          const { game } = findSet(p.setKey) ?? {};
+          const card = rows.find(r => r.key === p.setKey)?.data?.byId.get(p.id);
+          return card ? `<div style="--c:${game.color}">${cardThumb(card, 0)}</div>` : '';
+        }).join('') || '<p class="muted">Ouvre ton premier booster !</p>'}
+      </div>
+      <h2>Par set</h2>
+      <table class="table">
+        <thead><tr><th>Set</th><th>Boosters</th><th>Complétion</th><th>Valeur</th></tr></thead>
+        <tbody>${rows.filter(r => r.unique > 0 || state.totalPacks[r.key]).map(r => `
+          <tr><td><a href="#/collection/${r.key}">${esc(r.game.name)} — ${esc(r.set.name)}</a></td>
+          <td>${state.totalPacks[r.key] ?? 0}</td><td>${r.unique}/${r.total}</td><td>${fmt(r.value)}</td></tr>`).join('')}
+        </tbody>
+      </table>
+      <p class="danger-zone"><button class="btn ghost" data-reset>Réinitialiser ma collection</button></p>
+    </section>`;
+
+  app.querySelector('.grid').addEventListener('click', e => {
+    const b = e.target.closest('[data-card]'); if (!b) return;
+    const pull = state.bestPulls.find(p => p.id === b.dataset.card);
+    const { game } = findSet(pull.setKey);
+    const card = rows.find(r => r.key === pull.setKey).data.byId.get(pull.id);
+    openModal(card, game, owned(pull.setKey)[pull.id]);
+  });
+  app.querySelector('[data-reset]').addEventListener('click', () => {
+    if (confirm('Effacer toute ta collection et tes statistiques ? (Les boosters déjà ouverts aujourd\'hui restent comptés.)')) {
+      resetAll();
+      route();
+    }
+  });
+}
+
+function chart(points) {
+  if (points.length < 2) return '<p class="muted">Le graphique apparaîtra à partir de ton deuxième jour de collection.</p>';
+  const W = 800, H = 220, P = 28;
+  const vals = points.map(([, v]) => v);
+  const max = Math.max(...vals), min = Math.min(0, ...vals);
+  const x = i => P + (i / (points.length - 1)) * (W - 2 * P);
+  const y = v => H - P - ((v - min) / (max - min || 1)) * (H - 2 * P);
+  const line = points.map(([, v], i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
+  return `
+    <svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Évolution de la valeur de la collection">
+      <path d="${line}L${x(points.length - 1)},${H - P}L${x(0)},${H - P}Z" class="area"/>
+      <path d="${line}" class="line"/>
+      ${points.map(([d, v], i) => `<circle cx="${x(i)}" cy="${y(v)}" r="3.5"><title>${d} : ${fmt(v)}</title></circle>`).join('')}
+      <text x="${P}" y="${H - 6}">${points[0][0]}</text>
+      <text x="${W - P}" y="${H - 6}" text-anchor="end">${points[points.length - 1][0]}</text>
+      <text x="${W - P}" y="${y(max) - 8}" text-anchor="end">${fmt(max)}</text>
+    </svg>`;
+}
+
+function viewNotFound() {
+  app.innerHTML = '<section class="page"><h1>Page introuvable</h1><a class="btn" href="#/">Retour aux boosters</a></section>';
+}
+
+// ---------- Routeur ----------
+
+async function route() {
+  modal.hidden = true;
+  const path = location.hash.replace(/^#\/?/, '');
+  const [page, ...rest] = path.split('/');
+  const setKey = rest.join('/');
+  document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('on',
+    a.dataset.nav === (['open', 'game', ''].includes(page) ? 'home' : page)));
+  try {
+    if (!page) await viewHome();
+    else if (page === 'game') await viewGame(setKey);
+    else if (page === 'open') await viewOpen(setKey);
+    else if (page === 'collection') await (setKey ? viewCollectionSet(setKey) : viewCollection());
+    else if (page === 'stats') await viewStats();
+    else viewNotFound();
+  } catch (err) {
+    app.innerHTML = `<section class="page"><h1>Oups</h1><p>${esc(err.message)}</p></section>`;
+  }
+  window.scrollTo(0, 0);
+}
+
+window.addEventListener('hashchange', route);
+// Scan français absent chez TCGdex : on retente avec le scan anglais, puis on masque l'image.
+document.addEventListener('error', e => {
+  const img = e.target;
+  if (!(img instanceof HTMLImageElement)) return;
+  if (img.src.includes('assets.tcgdex.net/fr/')) img.src = img.src.replace('/fr/', '/en/');
+  else img.style.visibility = 'hidden';
+}, true);
+document.addEventListener('keydown', e => {
+  if (e.code !== 'Space' || !modal.hidden || e.target.matches('input, select, textarea, button')) return;
+  const stage = app.querySelector('.stage');
+  if (!stage) return;
+  e.preventDefault();
+  if (stage.revealNext) stage.revealNext();
+  else if (stage.querySelector('[data-open]')) stage.tear();
+});
+setInterval(() => document.querySelectorAll('.countdown').forEach(el => { el.textContent = untilMidnight(); }), 1000);
+
+route();
+refreshTotal();
