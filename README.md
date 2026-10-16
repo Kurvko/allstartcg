@@ -117,7 +117,15 @@ menu Attaque / Sac / Pokémon / Fin du tour, caméra, projectiles et impacts sel
 - Règles : [public/js/battle/engine.js](public/js/battle/engine.js) (Actif / Banc, Énergies, évolutions, Dresseurs, retraite, faiblesse / résistance, états spéciaux, Récompenses).
 - Effets des cartes lus dans le texte français : [public/js/battle/effects.js](public/js/battle/effects.js). Seuls les plus courants sont simulés.
 - Dresseurs (nom, type, répliques, portrait dessiné en SVG) : [public/js/battle/trainers.js](public/js/battle/trainers.js). Un Dresseur par partie, choisi selon le niveau et le type de son deck.
-- Jeu de l'adversaire : [public/js/battle/adversaire.js](public/js/battle/adversaire.js). Facile = au hasard, Normal = meilleur coup testé sur une copie de la partie (avec erreurs), Difficile = sans erreur et en anticipant l'attaque adverse.
+- Jeu de l'adversaire : [public/js/battle/adversaire.js](public/js/battle/adversaire.js).
+- Images du combat, libres de droits (CC0) : décors peints de [Nidhoggn](https://opengameart.org/content/backgrounds-3) et personnages
+  [Toon Characters 1 de Kenney](https://opengameart.org/content/toon-characters-1). Pour les ajouter au site :
+
+  ```
+  npm run battle-assets   # → public/battle/bg-<n>.webp et public/trainers/<personnage>-<pose>.webp
+  ```
+
+  Sans ces images, le combat utilise des portraits dessinés en SVG et des décors en CSS. Facile = au hasard, Normal = meilleur coup testé sur une copie de la partie (avec erreurs), Difficile = sans erreur et en anticipant l'attaque adverse.
 - Les données de combat (attaques, faiblesses, retraite…) viennent de TCGdex via `npm run fetch -- pokemon`.
 
 ## Effets et sons

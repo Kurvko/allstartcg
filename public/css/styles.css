@@ -1540,3 +1540,26 @@ main, .footer { position: relative; z-index: 1; }
   animation: ko-stamp 1.3s cubic-bezier(.3, 1.5, .5, 1) forwards;
 }
 @keyframes ko-stamp { 0% { scale: 3; opacity: 0; } 18% { scale: 1; opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; scale: .9; } }
+
+/* ---------- Combat : sprites des Dresseurs et décors peints (npm run battle-assets) ---------- */
+.tsprite { width: 100%; height: 100%; object-fit: contain; display: block; }
+.arena.has-bg .sky, .arena.has-bg .far, .arena.has-bg .ground { display: none; }
+.backdrop { position: absolute; inset: -8%; background: center 32% / cover no-repeat; }
+.arena.has-bg .pad {
+  background: radial-gradient(closest-side, #ffffff3a 0 58%, #00000033 64% 84%, #ffffff66 87% 100%);
+  box-shadow: 0 12px 22px -8px #0007;
+}
+.trainer-stand.sprite { height: 44%; aspect-ratio: 192 / 256; bottom: 45%; -webkit-mask-image: none; mask-image: none; }
+.trainer-stand.sprite img { filter: drop-shadow(0 10px 12px #0007); }
+.player-stand {
+  position: absolute; left: 26%; bottom: 3%; height: 56%; aspect-ratio: 192 / 256; z-index: 3; translate: -170% 0; opacity: 0;
+  transition: translate .7s cubic-bezier(.2, .9, .3, 1), opacity .5s;
+}
+.player-stand img { filter: drop-shadow(0 12px 14px #0008); }
+.arena.trainer-in .player-stand { translate: -50% 0; opacity: 1; }
+.arena.trainer-out .player-stand { translate: -180% 0; opacity: 0; transition-duration: .45s; }
+.mini-portrait .tsprite { object-fit: cover; object-position: 50% 6%; scale: 1.5; translate: 0 14%; }
+.vs-side .tsprite { width: min(210px, 52%); height: auto; filter: drop-shadow(0 14px 18px #0008); }
+.tspeech .tp .tsprite { object-fit: cover; object-position: 50% 0; scale: 1.3; transform-origin: 50% 18%; }
+.bover-portrait .tsprite { height: auto; }
+.bcredit { margin: 0; text-align: right; font-size: 11px; color: var(--muted); }

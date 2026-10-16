@@ -1,5 +1,6 @@
 // Dresseurs adverses du combat : un par partie, choisi selon le niveau et le type de son deck.
-// Les portraits sont dessinés en SVG à partir de quelques paramètres (coiffure, chapeau, tenue, expression).
+// Visuel : personnage « Toon Characters » de Kenney (CC0) avec plusieurs poses, téléchargé par `npm run battle-assets`
+// dans public/trainers/. Sans ces images, un portrait dessiné en SVG (coiffure, chapeau, tenue, expression) les remplace.
 
 const LINE = 'stroke="#1b1530" stroke-width="2.5" stroke-linejoin="round"';
 
@@ -90,66 +91,73 @@ export function portrait(look = {}) {
   </svg>`;
 }
 
-/** Le joueur, pour l'écran de face-à-face. */
-export const PLAYER_LOOK = { hair: 'short', hairColor: '#4a2c1a', hat: 'cap', hatColor: '#e5484d', outfit: '#2f6fe0', accent: '#ffd36b', brows: 'fierce', mouth: 'smile' };
+/** Image d'un personnage dans une pose (idle, talk, cheer1, hurt, down, back, interact, think). */
+export const spriteUrl = (sprite, pose = 'idle') => `trainers/${sprite}-${pose}.webp`;
 
-const T = (title, name, type, look, quotes) => ({ title, name, type, look, quotes, full: `${title} ${name}` });
+/** Le joueur (écran de face-à-face, vu de dos sur le terrain). */
+export const PLAYER = {
+  sprite: 'maleAdventurer',
+  look: { hair: 'short', hairColor: '#4a2c1a', hat: 'cap', hatColor: '#e5484d', outfit: '#2f6fe0', accent: '#ffd36b', brows: 'fierce', mouth: 'smile' },
+};
+
+// Comme dans les jeux, les Dresseurs d'une même allure partagent le même personnage.
+const T = (title, name, type, sprite, look, quotes) => ({ title, name, type, sprite, look, quotes, full: `${title} ${name}` });
 
 export const TRAINERS = {
   facile: [
-    T('Gamin', 'Théo', 'Plante', { hairColor: '#6b3f1f', hat: 'cap', hatColor: '#30a46c', outfit: '#f5c518', accent: '#30a46c', brows: 'happy', mouth: 'grin', blush: true }, {
+    T('Gamin', 'Théo', 'Plante', 'maleAdventurer', { hairColor: '#6b3f1f', hat: 'cap', hatColor: '#30a46c', outfit: '#f5c518', accent: '#30a46c', brows: 'happy', mouth: 'grin', blush: true }, {
       intro: 'Mes Pokémon Plante sont les plus forts du quartier !', ko: 'Hein ? Déjà K.O. ?!', taunt: 'Ha ! Tu as vu ça ?',
       win: 'J\'ai gagné ! Je vais le dire à tout le monde !', lose: 'Oh non… Je vais m\'entraîner encore plus !',
     }),
-    T('Fillette', 'Lily', 'Eau', { hair: 'ponytail', hairColor: '#e8a33c', hat: 'band', hatColor: '#3e8bff', outfit: '#ff8bd4', accent: '#3e8bff', blush: true, skin: '#f9dcc4' }, {
+    T('Fillette', 'Lily', 'Eau', 'femaleAdventurer', { hair: 'ponytail', hairColor: '#e8a33c', hat: 'band', hatColor: '#3e8bff', outfit: '#ff8bd4', accent: '#3e8bff', blush: true, skin: '#f9dcc4' }, {
       intro: 'Tu veux voir mes Pokémon Eau ? Ils sont trop mignons !', ko: 'Mais euh ! C\'est pas juste !', taunt: 'Plouf ! Hi hi !',
       win: 'Youpi ! J\'ai gagné !', lose: 'Bravo… Tu es vraiment doué !',
     }),
-    T('Scout', 'Malo', 'Combat', { hair: 'spiky', hairColor: '#2a2a2a', hat: 'band', hatColor: '#e5484d', outfit: '#c2703d', accent: '#ffd36b', brows: 'fierce', mouth: 'grin', skin: '#e0ac80' }, {
-      intro: 'Un vrai scout ne recule jamais ! En garde !', ko: 'Aïe ! Bien joué…', taunt: 'Et bim ! Entraînement réussi !',
-      win: 'Victoire ! Le badge du courage est à moi !', lose: 'Je reviendrai plus fort, promis !',
+    T('Karatéka', 'Malo', 'Combat', 'malePerson', { hair: 'spiky', hairColor: '#2a2a2a', hat: 'band', hatColor: '#e5484d', outfit: '#c2703d', accent: '#ffd36b', brows: 'fierce', mouth: 'grin', skin: '#e0ac80' }, {
+      intro: 'Un vrai karatéka ne recule jamais ! En garde !', ko: 'Aïe ! Bien joué…', taunt: 'Et bim ! Entraînement réussi !',
+      win: 'Victoire ! Mon dojo sera fier de moi !', lose: 'Je reviendrai plus fort, promis !',
     }),
-    T('Pique-niqueuse', 'Nina', 'Électrique', { hair: 'bob', hairColor: '#ffd36b', outfit: '#7c5cff', accent: '#f5c518', blush: true, acc: 'earring' }, {
+    T('Pique-niqueuse', 'Nina', 'Électrique', 'femalePerson', { hair: 'bob', hairColor: '#ffd36b', outfit: '#7c5cff', accent: '#f5c518', blush: true, acc: 'earring' }, {
       intro: 'Un petit combat avant le goûter ?', ko: 'Oups, court-circuit !', taunt: 'Ça grésille, hein ?',
       win: 'Trop bien ! On refait ça quand tu veux !', lose: 'Tu m\'as complètement électrisée !',
     }),
   ],
   normal: [
-    T('Topdresseur', 'Hugo', 'Feu', { hair: 'spiky', hairColor: '#c0392b', outfit: '#2a2f45', accent: '#ff6b3d', brows: 'fierce', mouth: 'smirk', acc: 'scarf' }, {
+    T('Topdresseur', 'Hugo', 'Feu', 'maleAdventurer', { hair: 'spiky', hairColor: '#c0392b', outfit: '#2a2f45', accent: '#ff6b3d', brows: 'fierce', mouth: 'smirk', acc: 'scarf' }, {
       intro: 'Mon équipe Feu va réduire tes cartes en cendres !', ko: 'Tch… Tu tiens la chaleur, toi.', taunt: 'Ça brûle, pas vrai ?',
       win: 'Rien ne résiste à mes flammes !', lose: 'Tu as éteint mon feu… Respect.',
     }),
-    T('Topdresseuse', 'Inès', 'Psy', { hair: 'long', hairColor: '#6b3fa0', outfit: '#c58bff', accent: '#ff6bd6', mouth: 'smirk', acc: 'earring', eyes: '#7a2a8a' }, {
+    T('Topdresseuse', 'Inès', 'Psy', 'femaleAdventurer', { hair: 'long', hairColor: '#6b3fa0', outfit: '#c58bff', accent: '#ff6bd6', mouth: 'smirk', acc: 'earring', eyes: '#7a2a8a' }, {
       intro: 'J\'ai déjà vu l\'issue de ce combat. Elle ne te plaira pas.', ko: 'Je n\'avais pas prévu ça…', taunt: 'Exactement comme je l\'avais vu.',
       win: 'Les cartes ne mentent jamais.', lose: 'Mon intuition m\'a trahie… Bien joué.',
     }),
-    T('Pêcheur', 'Yvon', 'Eau', { hairColor: '#5a5a5a', hat: 'beanie', hatColor: '#1a6fb0', outfit: '#e39b12', accent: '#3e8bff', mouth: 'grin', skin: '#d9a07a' }, {
+    T('Pêcheur', 'Yvon', 'Eau', 'malePerson', { hairColor: '#5a5a5a', hat: 'beanie', hatColor: '#1a6fb0', outfit: '#e39b12', accent: '#3e8bff', mouth: 'grin', skin: '#d9a07a' }, {
       intro: 'Ça mord ! Enfin un adversaire à ma taille !', ko: 'Il m\'a échappé, celui-là !', taunt: 'Belle prise !',
       win: 'Une pêche miraculeuse !', lose: 'Le gros poisson, c\'était toi…',
     }),
-    T('Ingénieure', 'Clara', 'Métal', { hair: 'bun', hairColor: '#2b2b3a', outfit: '#95a5a6', accent: '#3e7bff', acc: 'glasses' }, {
-      intro: 'J\'ai optimisé chaque carte de ce deck. Montre-moi ce que tu vaux.', ko: 'Une erreur de calcul…', taunt: 'Résultat conforme aux prévisions.',
-      win: 'Efficacité : cent pour cent.', lose: 'Je dois revoir mes plans. Impressionnant.',
+    T('Robot de combat', 'R-07', 'Métal', 'robot', { hair: 'bun', hairColor: '#2b2b3a', outfit: '#95a5a6', accent: '#3e7bff', acc: 'glasses' }, {
+      intro: 'Analyse terminée. Deck optimisé. Combat engagé.', ko: 'Erreur… Erreur de calcul…', taunt: 'Résultat conforme aux prévisions.',
+      win: 'Efficacité : cent pour cent. Bip.', lose: 'Défaite enregistrée. Mise à jour nécessaire.',
     }),
   ],
   difficile: [
-    T('Championne', 'Aria', 'Psy', { hair: 'long', hairColor: '#e8e8f5', hat: 'crown', hatColor: '#ffd36b', outfit: '#4b2a8f', accent: '#ff6bd6', mouth: 'smirk', eyes: '#c03aa0', acc: 'earring' }, {
+    T('Championne', 'Aria', 'Psy', 'femalePerson', { hair: 'long', hairColor: '#e8e8f5', hat: 'crown', hatColor: '#ffd36b', outfit: '#4b2a8f', accent: '#ff6bd6', mouth: 'smirk', eyes: '#c03aa0', acc: 'earring' }, {
       intro: 'Bienvenue dans mon Arène. Peu en ressortent victorieux.', ko: 'Intéressant… Tu es plus fort que prévu.', taunt: 'Tu ne peux rien contre mon esprit.',
       win: 'Reviens quand tu seras prêt.', lose: 'Tu as mérité ma reconnaissance, Dresseur.',
     }),
-    T('Champion', 'Ignis', 'Feu', { hair: 'spiky', hairColor: '#ff6b3d', hat: 'band', hatColor: '#2a2a2a', outfit: '#8a1f1f', accent: '#ffb347', brows: 'fierce', mouth: 'grin', acc: 'scarf', skin: '#e0ac80' }, {
+    T('Champion', 'Ignis', 'Feu', 'malePerson', { hair: 'spiky', hairColor: '#ff6b3d', hat: 'band', hatColor: '#2a2a2a', outfit: '#8a1f1f', accent: '#ffb347', brows: 'fierce', mouth: 'grin', acc: 'scarf', skin: '#e0ac80' }, {
       intro: 'Je suis le Champion Ignis ! Prépare-toi à brûler !', ko: 'Grr ! Tu as du cran !', taunt: 'Mes flammes ne s\'éteignent jamais !',
       win: 'Le feu triomphe toujours !', lose: 'Quel combat ! Tu as allumé quelque chose en moi.',
     }),
-    T('Maître Dragon', 'Kaïto', 'Dragon', { hair: 'long', hairColor: '#1b2a4a', outfit: '#c8a03b', accent: '#3a2a5c', brows: 'fierce', mouth: 'smirk', acc: 'scarf' }, {
+    T('Maître Dragon', 'Kaïto', 'Dragon', 'maleAdventurer', { hair: 'long', hairColor: '#1b2a4a', outfit: '#c8a03b', accent: '#3a2a5c', brows: 'fierce', mouth: 'smirk', acc: 'scarf' }, {
       intro: 'Les dragons ne s\'inclinent devant personne. Montre ta force.', ko: 'Hmph. Pas mal.', taunt: 'Sens la puissance des dragons !',
       win: 'Les dragons règnent toujours.', lose: 'Tu as dompté mes dragons… Incroyable.',
     }),
-    T('Championne', 'Nyx', 'Obscurité', { hair: 'bob', hairColor: '#1a1a2e', hat: 'hood', hatColor: '#2e2440', outfit: '#3a2a5c', accent: '#b98bff', mouth: 'smirk', eyes: '#b98bff' }, {
-      intro: 'Dans l\'ombre, personne ne t\'entendra perdre.', ko: 'Tu vois dans le noir, toi…', taunt: 'Les ténèbres t\'engloutissent.',
-      win: 'Retourne d\'où tu viens.', lose: 'La lumière gagne, cette fois…',
+    T('Champion', 'Morvan', 'Obscurité', 'zombie', { hair: 'bob', hairColor: '#1a1a2e', hat: 'hood', hatColor: '#2e2440', outfit: '#3a2a5c', accent: '#b98bff', mouth: 'smirk', eyes: '#b98bff' }, {
+      intro: 'Grrr… Dans l\'ombre, personne ne t\'entendra perdre.', ko: 'Tu vois dans le noir, toi…', taunt: 'Les ténèbres t\'engloutissent.',
+      win: 'Retourne d\'où tu viens… Grrr.', lose: 'La lumière gagne, cette fois…',
     }),
-    T('Champion', 'Volt', 'Électrique', { hair: 'spiky', hairColor: '#f5c518', hat: 'cap', hatColor: '#2a2f45', outfit: '#f5c518', accent: '#2a2f45', brows: 'fierce', mouth: 'grin' }, {
+    T('Champion', 'Volt', 'Électrique', 'robot', { hair: 'spiky', hairColor: '#f5c518', hat: 'cap', hatColor: '#2a2f45', outfit: '#f5c518', accent: '#2a2f45', brows: 'fierce', mouth: 'grin' }, {
       intro: 'Cent mille volts de pure puissance ! Tu es prêt ?', ko: 'Une baisse de tension… temporaire !', taunt: 'Ça, c\'est du courant !',
       win: 'Foudroyé ! Comme prévu !', lose: 'Tu m\'as mis à plat… Bravo !',
     }),

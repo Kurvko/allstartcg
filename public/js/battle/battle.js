@@ -8,7 +8,7 @@ import {
   setup, slotAt, STATUS_FR, topCard, energyType,
 } from './engine.js';
 import { chooseAction, chooseSetup, bestPromotion, LEVELS } from './adversaire.js';
-import { TRAINERS, pickTrainer, portrait, PLAYER_LOOK } from './trainers.js';
+import { TRAINERS, pickTrainer, portrait, PLAYER, spriteUrl } from './trainers.js';
 import { icon } from '../icons.js';
 import { buildDeck, basicEnergy, mainTypes } from './build.js';
 import { sfx, bgm } from '../sfx.js';
@@ -49,10 +49,27 @@ async function deckCards(deck) {
   return out;
 }
 
+// ---------- Images libres (npm run battle-assets) ----------
+// Sprites des Dresseurs et décors peints, s'ils ont été téléchargés ; sinon portraits dessinés et décors en CSS.
+const ASSETS = { sprites: false, backdrops: false };
+let assetsChecked = null;
+const present = url => fetch(url, { method: 'HEAD' }).then(r => r.ok, () => false);
+function detectAssets() {
+  assetsChecked ??= Promise.all([present(spriteUrl('maleAdventurer')), present('battle/bg-1.webp')])
+    .then(([sprites, backdrops]) => Object.assign(ASSETS, { sprites, backdrops }));
+  return assetsChecked;
+}
+/** Visuel d'un Dresseur dans une pose : sprite si disponible, sinon portrait dessiné. */
+const art = (t, pose = 'idle') => (ASSETS.sprites ? `<img class="tsprite" src="${spriteUrl(t.sprite, pose)}" alt="">` : portrait(t.look));
+// Décor peint selon le type du Dresseur ; les Champions se battent dans l'arène.
+const BACKDROP = { Plante: 1, Eau: 2, Combat: 3, Fée: 4, Incolore: 4, Métal: 5, Électrique: 6, Feu: 7, Psy: 8, Obscurité: 8, Dragon: 9 };
+const backdropOf = (trainer, level) => `battle/bg-${level === 'difficile' ? 9 : BACKDROP[trainer.type] ?? 10}.webp`;
+
 // ---------- Écran de choix ----------
 let choice = { deck: null, level: 'normal' };
 
 export async function viewBattle() {
+  await detectAssets();
   const decks = getDecks('pokemon');
   const usable = [];
   for (const d of decks) {
@@ -82,8 +99,8 @@ export async function viewBattle() {
         ${Object.entries(LEVELS).map(([k, l]) => {
           const r = stats[`pokemon/${k}`] ?? { w: 0, l: 0 };
           return `<button class="pick ${choice.level === k ? 'on' : ''}" data-v="${k}">
-            <span class="pick-trainers">${TRAINERS[k].map(t => `<span class="mini-portrait" title="${esc(t.full)} · ${esc(t.type)}">${portrait(t.look)}</span>`).join('')}</span>
-            <b>${l.label}</b><small>${{ facile: 'Gamins, Fillettes et Scouts : ils jouent un peu au hasard.', normal: 'Topdresseurs : de bons coups, avec quelques erreurs.', difficile: 'Champions d\'Arène : ils calculent, anticipent tes attaques et jouent un deck fort.' }[k]}</small>
+            <span class="pick-trainers">${TRAINERS[k].map(t => `<span class="mini-portrait" title="${esc(t.full)} · ${esc(t.type)}">${art(t)}</span>`).join('')}</span>
+            <b>${l.label}</b><small>${{ facile: 'Gamins, Fillettes, Pique-niqueuses et Karatékas : ils jouent un peu au hasard.', normal: 'Topdresseurs : de bons coups, avec quelques erreurs.', difficile: 'Champions d\'Arène : ils calculent, anticipent tes attaques et jouent un deck fort.' }[k]}</small>
             <small class="record">${r.w} victoire${r.w > 1 ? 's' : ''} · ${r.l} défaite${r.l > 1 ? 's' : ''}</small></button>`;
         }).join('')}
       </div>
@@ -146,14 +163,16 @@ function startBattle(myDeck, aiDeck, level, trainer) {
   app.innerHTML = `
     <section class="page battle rosa">
       <div class="bwrap">
-        <div class="arena t-${TERRAIN[trainer.type] ?? 'plain'} intro">
+        <div class="arena t-${TERRAIN[trainer.type] ?? 'plain'} ${ASSETS.backdrops ? 'has-bg' : ''} intro">
           <div class="sky"><i class="cloud c1"></i><i class="cloud c2"></i><i class="cloud c3"></i></div>
           <div class="far"></div>
           <div class="world">
+            ${ASSETS.backdrops ? `<div class="backdrop" style="background-image:url('${backdropOf(trainer, level)}')"></div>` : ''}
             <div class="ground"></div>
             <div class="pad foe"></div>
             <div class="pad me"></div>
-            <div class="trainer-stand">${portrait(trainer.look)}</div>
+            <div class="trainer-stand ${ASSETS.sprites ? 'sprite' : ''}">${art(trainer)}</div>
+            ${ASSETS.sprites ? `<div class="player-stand">${art(PLAYER, 'back')}</div>` : ''}
             <div class="fighters"></div>
           </div>
           <div class="hud"></div>
@@ -161,6 +180,7 @@ function startBattle(myDeck, aiDeck, level, trainer) {
           <div class="msgbox" title="Clique pour passer"><p></p><i>${icon('chevron-down')}</i></div>
         </div>
         <div class="console"></div>
+        ${ASSETS.sprites || ASSETS.backdrops ? '<p class="bcredit">Décors : Nidhoggn · Personnages : Kenney (licence CC0)</p>' : ''}
       </div>
       <aside class="bpreview"><p>Survole une carte pour la voir en grand.</p></aside>
     </section>`;
@@ -177,8 +197,8 @@ async function intro(ui) {
   const o = ui.arena.querySelector('.overlay');
   o.insertAdjacentHTML('beforeend', `
     <div class="vs" style="--tc:${TYPE_HEX[t.type] ?? '#e5484d'}">
-      <div class="vs-side me">${portrait(PLAYER_LOOK)}<b>Toi</b></div>
-      <div class="vs-side foe">${portrait(t.look)}<b>${esc(t.full)}</b><small>Type ${esc(t.type)}</small></div>
+      <div class="vs-side me">${art(PLAYER)}<b>Toi</b></div>
+      <div class="vs-side foe">${art(t, 'talk')}<b>${esc(t.full)}</b><small>Type ${esc(t.type)}</small></div>
       <div class="vs-mark">VS</div>
     </div>`);
   sfx.encounter();
@@ -197,13 +217,21 @@ async function intro(ui) {
   render(ui);
 }
 
-/** Le Dresseur parle : bulle avec son portrait, et la phrase dans la boîte de messages. */
-async function trainerSay(ui, text) {
+/** Change la pose du Dresseur debout sur le terrain (sprites seulement). */
+function standPose(ui, pose) {
+  const img = ui.arena.querySelector('.trainer-stand img');
+  if (img) img.src = spriteUrl(ui.trainer.sprite, pose);
+}
+
+/** Le Dresseur parle : bulle avec son visage (dans la pose voulue), et la phrase dans la boîte de messages. */
+async function trainerSay(ui, text, pose = 'talk') {
   if (!text || !alive(ui)) return;
   const o = ui.arena.querySelector('.overlay');
   o.querySelector('.tspeech')?.remove();
-  o.insertAdjacentHTML('beforeend', `<div class="tspeech"><span class="tp">${portrait(ui.trainer.look)}</span><b>${esc(ui.trainer.full)}</b></div>`);
+  o.insertAdjacentHTML('beforeend', `<div class="tspeech"><span class="tp">${art(ui.trainer, pose)}</span><b>${esc(ui.trainer.full)}</b></div>`);
+  standPose(ui, pose);
   await say(ui, `« ${text} »`);
+  standPose(ui, 'idle');
   o.querySelector('.tspeech')?.classList.add('out');
   setTimeout(() => o.querySelector('.tspeech.out')?.remove(), 400);
 }
@@ -441,7 +469,7 @@ function showEnd(ui) {
   const t = ui.trainer;
   ui.arena.querySelector('.overlay').innerHTML = `
     <div class="bover ${won ? 'win' : 'lose'}">
-      <span class="bover-portrait">${portrait(t.look)}</span>
+      <span class="bover-portrait">${art(t, won ? 'down' : 'cheer1')}</span>
       <h2>${won ? `${icon('trophy')} Victoire !` : 'Défaite…'}</h2><p>${esc(tutoie(ui.g.reason))}</p>
       <blockquote><b>${esc(t.full)}</b> « ${esc(won ? t.quotes.lose : t.quotes.win)} »</blockquote>
     </div>`;
@@ -786,7 +814,10 @@ async function playback(ui, before, { side = 0, action = null, lines = null } = 
       await faint(ui, gone);
       await say(ui, line);
       // Le Dresseur réagit (pas à chaque fois, pour ne pas se répéter).
-      if (g.winner == null && Math.random() < 0.7) await trainerSay(ui, / Toi prend /.test(line) ? ui.trainer.quotes.ko : ui.trainer.quotes.taunt);
+      if (g.winner == null && Math.random() < 0.7) {
+        const hurt = / Toi prend /.test(line);
+        await trainerSay(ui, hurt ? ui.trainer.quotes.ko : ui.trainer.quotes.taunt, hurt ? 'hurt' : 'cheer1');
+      }
       continue;
     }
     if ((m = line.match(/^— Tour (\d+) : (.+) —$/))) { await turnBanner(ui, m[1], m[2]); continue; }
@@ -838,7 +869,9 @@ async function doSetup(ui) {
   ui.busy = true;
   renderConsole(ui);
   const logLen = g.log.length;
-  // Le Dresseur s'efface pour laisser sa carte entrer sur le terrain.
+  // Le Dresseur désigne le terrain, puis s'efface (avec le joueur) pour laisser les cartes entrer.
+  standPose(ui, 'interact');
+  await wait(ui, 350);
   ui.arena.classList.add('trainer-out');
   sfx.whoosh(0.2);
   await wait(ui, 500);
