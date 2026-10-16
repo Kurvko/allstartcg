@@ -293,6 +293,10 @@ export const GAMES = [
   },
 ];
 
+// Ordre d'affichage des jeux partout sur le site.
+const GAME_ORDER = ['pokemon', 'onepiece', 'dragonball', 'yugioh', 'riftbound', 'lorcana', 'magic'];
+GAMES.sort((a, b) => GAME_ORDER.indexOf(a.id) - GAME_ORDER.indexOf(b.id));
+
 // Dos officiel des cartes de chaque jeu (public/backs/<jeu>.webp).
 for (const game of GAMES) game.back = `backs/${game.id}.webp`;
 
