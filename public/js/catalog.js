@@ -225,15 +225,6 @@ export const GAMES = [
     color: '#e23b3b',
     accent: '#1b3a6b',
     sets: [
-      {
-        id: 'OP-01', packPrice: 12, name: 'Romance Dawn (VO)', year: 2022, group: 'Version anglaise', source: 'optcg',
-        tiers: { C: 0, UC: 1, R: 2, L: 2, SR: 3, AA: 4, SEC: 5 },
-        slots: [
-          ...C(7, 'C'), ...C(3, 'UC'),
-          [['C', 70], ['L', 30]],
-          [['R', 74], ['SR', 17], ['AA', 6], ['SEC', 3]],
-        ],
-      },
       // Sets sortis en français (VF lancée le 7 février 2025 avec OP-09).
       ...[
         ['OP09', 23589, 'OP-09 – Les Nouveaux Empereurs', 2025, 6],
@@ -250,7 +241,7 @@ export const GAMES = [
         ['OP16', 24664, 'OP-16 – L\'Heure de la Bataille Décisive', 2026, 6],
         ['OP17', 24736, 'OP-17 – Les Guerriers les plus Puissants au Monde', 2026, 6],
       ].map(([id, group, name, year, packPrice]) => ({
-        id, name, year, packPrice, group: 'Version française', source: 'tcgcsv', category: 68, tcgGroup: group,
+        id, name, year, packPrice, source: 'tcgcsv', category: 68, tcgGroup: group,
         tiers: OP_TIERS, slots: id.startsWith('PRB') ? PRB_SLOTS : OP_SLOTS, variants: OP_VARIANTS,
       })),
     ],

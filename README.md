@@ -56,7 +56,7 @@ Relance-le de temps en temps (une fois par semaine par exemple) : la valeur de t
 1. Ajoute une entrée dans [public/js/catalog.js](public/js/catalog.js) : id du set, raretés (`tiers`) et composition du booster (`slots`).
 2. Lance `npm run fetch`. Le script signale les raretés qui manquent dans `tiers`.
 
-Sources : TCGdex (Pokémon), Scryfall (Magic), YGOPRODeck (Yu-Gi-Oh!), Lorcast (Lorcana), OPTCG API (One Piece), TCGCSV (Dragon Ball Super, Riftbound).
+Sources : TCGdex (Pokémon), Scryfall (Magic), YGOPRODeck (Yu-Gi-Oh!), Lorcast (Lorcana), TCGCSV (One Piece, Dragon Ball Super, Riftbound).
 
 TCGCSV couvre tous les jeux vendus sur TCGplayer : pour un nouveau jeu, trouve son `category` et le `group` du set sur https://tcgcsv.com/tcgplayer/categories puis utilise `source: 'tcgcsv'`.
 

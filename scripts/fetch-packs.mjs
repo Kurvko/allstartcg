@@ -22,7 +22,7 @@ const GROUP_NAME = {
   'pokemon/swsh12.5': 'SWSH: Crown Zenith', 'pokemon/sv03.5': 'SV: Scarlet & Violet 151', 'pokemon/exu': 'EX Unseen Forces', 'pokemon/swsh10.5': 'Pokemon GO', 'pokemon/ecard1': 'Expedition',
   'magic/lea': 'Alpha Edition', 'magic/blb': 'Bloomburrow',
   'yugioh/LOB': 'The Legend of Blue Eyes White Dragon', 'yugioh/MRD': 'Metal Raiders',
-  'lorcana/1': 'The First Chapter', 'onepiece/OP-01': 'Romance Dawn',
+  'lorcana/1': 'The First Chapter',
 };
 
 const HEADERS = { 'User-Agent': 'AllStarTCG/0.1 (projet perso)', Accept: 'application/json' };

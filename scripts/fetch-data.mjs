@@ -144,25 +144,6 @@ async function fromLorcast(set) {
   }));
 }
 
-async function fromOptcg(set) {
-  const cards = await getJson(`https://optcgapi.com/api/sets/${set.id}/`);
-  const seen = new Set();
-  return cards.filter(c => {
-    if (seen.has(c.card_image_id)) return false;
-    seen.add(c.card_image_id);
-    return true;
-  }).map(c => ({
-    id: c.card_image_id,
-    name: c.card_name,
-    num: c.card_set_id,
-    rarity: /_p\d/.test(c.card_image_id) ? 'AA' : c.rarity,
-    img: c.card_image,
-    imgHi: c.card_image,
-    price: usd(c.market_price) ?? usd(c.inventory_price),
-    play: play({ kind: (c.card_type ?? 'character').toLowerCase(), colors: list(c.card_color?.replace(/ /g, ';')), cost: num(c.card_cost), power: num(c.card_power) }),
-  })).sort((a, b) => a.id.localeCompare(b.id));
-}
-
 // TCGCSV : miroir quotidien des données TCGplayer (tous les jeux). Les produits scellés n'ont pas de rareté.
 async function fromTcgcsv(set) {
   const base = `https://tcgcsv.com/tcgplayer/${set.category}/${set.tcgGroup}`;
@@ -202,7 +183,7 @@ function tcgcsvPlay(p, field) {
   });
 }
 
-const SOURCES = { tcgdex: fromTcgdex, scryfall: fromScryfall, ygoprodeck: fromYgoprodeck, lorcast: fromLorcast, optcg: fromOptcg, tcgcsv: fromTcgcsv };
+const SOURCES = { tcgdex: fromTcgdex, scryfall: fromScryfall, ygoprodeck: fromYgoprodeck, lorcast: fromLorcast, tcgcsv: fromTcgcsv };
 
 // ---------- Main ----------
 
