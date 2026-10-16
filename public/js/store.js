@@ -10,7 +10,7 @@ const blank = () => ({
   history: {},      // { "2026-10-15": 123.45 } valeur de la collection par jour
   bestPulls: [],    // [{ setKey, id, name, img, price, at }]
   favorites: {},    // { "pokemon/sv01|sv01-001": { on: true, at } } cartes favorites
-  battles: {},      // { "pokemon/difficile": { w: 3, l: 1 } } résultats des combats contre l'IA
+  battles: {},      // { "pokemon/difficile": { w: 3, l: 1 } } résultats des combats par niveau
   decks: {},        // { "<id>": { id, game, name, cards: { "pokemon/sv01|sv01-001": 2, "basic:Feu": 10 }, updatedAt } }
   deletedDecks: {}, // { "<id>": date de suppression } pour la synchro entre appareils
   resetAt: 0,       // date de la dernière réinitialisation de la collection
@@ -165,7 +165,7 @@ export function replaceState(next) {
   save({ silent: true });
 }
 
-/** Résultat d'un combat contre l'IA. */
+/** Résultat d'un combat. */
 export function recordBattle(key, won) {
   const r = (state.battles[key] ??= { w: 0, l: 0 });
   if (won) r.w++; else r.l++;

@@ -1,13 +1,15 @@
-// Page Combat : un deck Pokémon contre l'IA (3 niveaux), mis en scène comme un combat des jeux Pokémon 3DS
+// Page Combat : un deck Pokémon contre un Dresseur (3 niveaux), mis en scène comme un combat des jeux Pokémon 3DS
 // (Rubis Oméga / Saphir Alpha). Les règles restent celles du JCC (engine.js) : ce fichier ne gère que l'affichage.
 import { loadSet } from '../data.js';
 import { getDecks, getState, recordBattle } from '../store.js';
 import { app, esc } from '../ui.js';
 import {
-  apply, attackable, canRetreat, card, hpLeft, isBasic, legalActions, maxHp, newGame, promote, retreatCost,
+  apply, attackable, canRetreat, card, hpLeft, isBasic, legalActions, maxHp, newGame, prizeValue, promote, retreatCost,
   setup, slotAt, STATUS_FR, topCard, energyType,
 } from './engine.js';
-import { chooseAction, chooseSetup, bestPromotion, LEVELS } from './ai.js';
+import { chooseAction, chooseSetup, bestPromotion, LEVELS } from './adversaire.js';
+import { TRAINERS, pickTrainer, portrait, PLAYER_LOOK } from './trainers.js';
+import { icon } from '../icons.js';
 import { buildDeck, basicEnergy, mainTypes } from './build.js';
 import { sfx, bgm } from '../sfx.js';
 import * as fx from '../fx.js';
@@ -19,7 +21,7 @@ const TYPE_HEX = {
 const dot = t => `<i class="edot" style="background:${TYPE_HEX[t] ?? '#999'}" title="${esc(t)}"></i>`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// Réserves de cartes de l'IA selon le niveau (sets complets, cartes les plus fortes en Difficile).
+// Réserves de cartes de l'adversaire selon le niveau (sets complets, cartes les plus fortes en Difficile).
 const AI_POOLS = {
   facile: { sets: ['sv01'], strength: 0.3 },
   normal: { sets: ['sv03.5', 'sv01'], strength: 0.8 },
@@ -65,7 +67,7 @@ export async function viewBattle() {
   app.innerHTML = `
     <section class="page battle-setup" style="--c:#ffcb05;--a:#3d7dca">
       <h1>Combat Pokémon</h1>
-      <p class="muted">Affronte l'IA avec ton deck, avec les vraies règles du JCC : Pokémon Actif et Banc, Énergies, évolutions, Dresseurs, faiblesses, états spéciaux, 6 Récompenses.
+      <p class="muted">Affronte des Dresseurs avec ton deck, avec les vraies règles du JCC : Pokémon Actif et Banc, Énergies, évolutions, Dresseurs, faiblesses, états spéciaux, 6 Récompenses.
       Les effets les plus courants des cartes sont simulés ; les autres sont ignorés.</p>
       <h2>Ton deck</h2>
       <div class="pick-list" data-pick="deck">
@@ -80,11 +82,12 @@ export async function viewBattle() {
         ${Object.entries(LEVELS).map(([k, l]) => {
           const r = stats[`pokemon/${k}`] ?? { w: 0, l: 0 };
           return `<button class="pick ${choice.level === k ? 'on' : ''}" data-v="${k}">
-            <b>${l.label}</b><small>${{ facile: 'L\'IA joue un peu au hasard.', normal: 'L\'IA joue les bons coups, avec quelques erreurs.', difficile: 'L\'IA calcule, anticipe tes attaques et joue un deck fort.' }[k]}</small>
+            <span class="pick-trainers">${TRAINERS[k].map(t => `<span class="mini-portrait" title="${esc(t.full)} · ${esc(t.type)}">${portrait(t.look)}</span>`).join('')}</span>
+            <b>${l.label}</b><small>${{ facile: 'Gamins, Fillettes et Scouts : ils jouent un peu au hasard.', normal: 'Topdresseurs : de bons coups, avec quelques erreurs.', difficile: 'Champions d\'Arène : ils calculent, anticipent tes attaques et jouent un deck fort.' }[k]}</small>
             <small class="record">${r.w} victoire${r.w > 1 ? 's' : ''} · ${r.l} défaite${r.l > 1 ? 's' : ''}</small></button>`;
         }).join('')}
       </div>
-      <p class="battle-go"><button class="btn primary" data-start>⚔️ Lancer le combat</button></p>
+      <p class="battle-go"><button class="btn primary" data-start>${icon('swords')} Lancer le combat</button></p>
       <p class="muted small">Contre de vrais joueurs : bientôt (il faut activer les comptes en ligne).</p>
     </section>`;
 
@@ -100,10 +103,9 @@ export async function viewBattle() {
       : await deckCards(getState().decks[choice.deck]);
     const aiCfg = AI_POOLS[choice.level];
     const aiPool = await poolOf(aiCfg.sets);
-    const types = mainTypes(aiPool).slice(0, 4);
-    const aiType = types[Math.floor(Math.random() * types.length)];
-    const aiDeck = buildDeck(aiPool, aiType, { strength: aiCfg.strength });
-    startBattle(mine, aiDeck, choice.level, aiType);
+    const trainer = pickTrainer(choice.level, mainTypes(aiPool).slice(0, 6));
+    const aiDeck = buildDeck(aiPool, trainer.type, { strength: aiCfg.strength });
+    startBattle(mine, aiDeck, choice.level, trainer);
   });
 }
 
@@ -136,26 +138,27 @@ const hpClass = pct => (pct > 0.5 ? 'hp-ok' : pct > 0.2 ? 'hp-mid' : 'hp-low');
 const typeOf = c => c?.play?.colors?.[0] ?? 'Incolore';
 const wait = (ui, ms) => sleep(ui.fast ? ms / 2 : ms);
 
-function startBattle(myDeck, aiDeck, level, aiType) {
-  const g = newGame([myDeck, aiDeck], { names: ['Toi', `IA ${LEVELS[level].label}`] });
+function startBattle(myDeck, aiDeck, level, trainer) {
+  const g = newGame([myDeck, aiDeck], { names: ['Toi', trainer.full] });
   let fast = false;
   try { fast = localStorage.getItem(FAST_KEY) === '1'; } catch { /* stockage indisponible */ }
-  const ui = { g, level, view: 'main', sel: null, selActions: null, mode: null, setupPick: [], busy: true, done: false, fast, shown: null, preview: null, skip: false };
+  const ui = { g, level, trainer, view: 'main', sel: null, selActions: null, mode: null, setupPick: [], busy: true, done: false, fast, shown: null, preview: null, skip: false };
   app.innerHTML = `
     <section class="page battle rosa">
       <div class="bwrap">
-        <div class="arena t-${TERRAIN[aiType] ?? 'plain'} intro">
+        <div class="arena t-${TERRAIN[trainer.type] ?? 'plain'} intro">
           <div class="sky"><i class="cloud c1"></i><i class="cloud c2"></i><i class="cloud c3"></i></div>
           <div class="far"></div>
           <div class="world">
             <div class="ground"></div>
             <div class="pad foe"></div>
             <div class="pad me"></div>
+            <div class="trainer-stand">${portrait(trainer.look)}</div>
             <div class="fighters"></div>
           </div>
           <div class="hud"></div>
           <div class="overlay"></div>
-          <div class="msgbox" title="Clique pour passer"><p></p><i>▼</i></div>
+          <div class="msgbox" title="Clique pour passer"><p></p><i>${icon('chevron-down')}</i></div>
         </div>
         <div class="console"></div>
       </div>
@@ -164,19 +167,45 @@ function startBattle(myDeck, aiDeck, level, aiType) {
   ui.root = app.querySelector('.battle');
   ui.arena = ui.root.querySelector('.arena');
   bind(ui);
-  bgm.start();
-  sfx.whoosh(0.25);
   intro(ui);
 }
 
+/** Face-à-face avec le Dresseur, puis il se présente sur le terrain. */
 async function intro(ui) {
+  const t = ui.trainer;
   renderConsole(ui);
-  await sleep(900);
+  const o = ui.arena.querySelector('.overlay');
+  o.insertAdjacentHTML('beforeend', `
+    <div class="vs" style="--tc:${TYPE_HEX[t.type] ?? '#e5484d'}">
+      <div class="vs-side me">${portrait(PLAYER_LOOK)}<b>Toi</b></div>
+      <div class="vs-side foe">${portrait(t.look)}<b>${esc(t.full)}</b><small>Type ${esc(t.type)}</small></div>
+      <div class="vs-mark">VS</div>
+    </div>`);
+  sfx.encounter();
+  await sleep(2400);
+  if (!alive(ui)) return;
+  o.querySelector('.vs')?.classList.add('out');
   ui.arena.classList.remove('intro');
-  await say(ui, `${ui.g.players[1].name} veut se battre !`);
+  bgm.start();
+  await sleep(450);
+  o.querySelector('.vs')?.remove();
+  ui.arena.classList.add('trainer-in');
+  await say(ui, `${t.full} te défie !`);
+  await trainerSay(ui, t.quotes.intro);
   for (const line of ui.g.log) await say(ui, line);
   ui.busy = false;
   render(ui);
+}
+
+/** Le Dresseur parle : bulle avec son portrait, et la phrase dans la boîte de messages. */
+async function trainerSay(ui, text) {
+  if (!text || !alive(ui)) return;
+  const o = ui.arena.querySelector('.overlay');
+  o.querySelector('.tspeech')?.remove();
+  o.insertAdjacentHTML('beforeend', `<div class="tspeech"><span class="tp">${portrait(ui.trainer.look)}</span><b>${esc(ui.trainer.full)}</b></div>`);
+  await say(ui, `« ${text} »`);
+  o.querySelector('.tspeech')?.classList.add('out');
+  setTimeout(() => o.querySelector('.tspeech.out')?.remove(), 400);
 }
 
 // ---------- Affichage ----------
@@ -200,7 +229,7 @@ function fighterHtml(ui, side, targets) {
   if (!s) return '';
   const c = topCard(g, s);
   return `
-    <div class="fighter ${side ? 'foe' : 'me'} ${s.status ? `st-${s.status}` : ''} ${targets.has(`${side}|active|0`) ? 'target' : ''}"
+    <div class="fighter ${side ? 'foe' : 'me'} ${s.status ? `st-${s.status}` : ''} ${prizeValue(c) >= 2 ? 'ex' : ''} ${targets.has(`${side}|active|0`) ? 'target' : ''}"
       data-key="${keyOf(side, s)}" data-slot="${side}|active|0" data-uid="${s.stack[s.stack.length - 1]}">
       <div class="fshadow"></div>
       <div class="bcard"><img src="${c.imgHi ?? c.img}" alt="${esc(c.name)}"><i class="bshine"></i></div>
@@ -216,10 +245,10 @@ function hpBox(ui, side) {
   return `
     <div class="hpbox ${side ? 'foe' : 'me'}" data-hp="${side}">
       <div class="hb-top"><b class="hb-name">${s ? esc(c.name) : '—'}</b>
-        ${s?.status ? `<span class="st st-${s.status}" title="${STATUS_FR[s.status]}">${STATUS_SHORT[s.status]}</span>` : ''}
+        ${s.status ? `<span class="st st-${s.status}" title="${STATUS_FR[s.status]}">${STATUS_SHORT[s.status]}</span>` : ''}
         <span class="hb-prizes" title="${p.prizes.length} Récompense${p.prizes.length > 1 ? 's' : ''} restante${p.prizes.length > 1 ? 's' : ''}">${balls}</span></div>
       <div class="hb-bar"><span>PV</span><div class="bar ${hpClass(pct)}"><i style="width:${pct * 100}%"></i></div></div>
-      <div class="hb-bottom"><span class="hb-en">${s ? s.energies.map(uid => dot(energyType(card(g, uid)))).join('') : ''}${s?.tools.length ? '<span title="Outil attaché">🔧</span>' : ''}</span>
+      <div class="hb-bottom"><span class="hb-en">${s.energies.map(uid => dot(energyType(card(g, uid)))).join('')}${s.tools.length ? `<span class="hb-tool" title="Outil attaché">${icon('wrench')}</span>` : ''}</span>
         <b class="hb-num">${hp}/${max}</b></div>
       <div class="hb-meta">${esc(p.name)} · Main ${p.hand.length} · Deck ${p.deck.length}</div>
     </div>`;
@@ -279,7 +308,7 @@ function renderConsole(ui) {
   if (!alive(ui)) return;
   const g = ui.g, me = g.players[0], foe = g.players[1];
   const view = consoleView(ui);
-  const fastBtn = `<button class="cfast ${ui.fast ? 'on' : ''}" data-fast title="Animations plus rapides">⏩ ${ui.fast ? 'Rapide' : 'Normal'}</button>`;
+  const fastBtn = `<button class="cfast ${ui.fast ? 'on' : ''}" data-fast title="Animations plus rapides">${icon('fast-forward')} ${ui.fast ? 'Rapide' : 'Normal'}</button>`;
   let body = '';
   if (view === 'wait') {
     body = `<div class="cprompt wait">${g.current === 1 && g.winner == null ? `${esc(foe.name)} réfléchit<span class="dots3"><i>.</i><i>.</i><i>.</i></span>` : '…'}</div>`;
@@ -290,7 +319,7 @@ function renderConsole(ui) {
         const k = ui.setupPick.indexOf(uid);
         return handCardHtml(ui, uid, '', { playable: isBasic(card(g, uid)) && k < 0, selected: k >= 0, badge: k === 0 ? 'Actif' : k > 0 ? 'Banc' : '' });
       }).join('')}</div>
-      <div class="crow"><button class="cbtn fight" data-setup-ok ${ui.setupPick.length ? '' : 'disabled'}>✔ Valider</button></div>`;
+      <div class="crow"><button class="cbtn fight" data-setup-ok ${ui.setupPick.length ? '' : 'disabled'}>${icon('check')} Valider</button></div>`;
   } else if (view === 'promote') {
     body = `
       <div class="cprompt">Ton Pokémon Actif est K.O. ! Qui envoies-tu ?</div>
@@ -299,7 +328,7 @@ function renderConsole(ui) {
     body = `
       <div class="cprompt">${ui.mode === 'retreat' ? `Retraite (coût ${retreatCost(g, me.active)}) : qui passe Actif ?` : `<b>${esc(card(g, ui.sel).name)}</b> : choisis une cible.`}</div>
       <div class="targets">${[...targetSet(ui)].map(ref => slotButton(ui, ref)).join('')}</div>
-      <div class="crow"><button class="cbtn back" data-cancel>✕ Annuler</button></div>`;
+      <div class="crow"><button class="cbtn back" data-cancel>${icon('x')} Annuler</button></div>`;
   } else if (view === 'attack') {
     const top = topCard(g, me.active), ok = attackable(g, 0).map(x => x.i);
     const why = g.turn === 1 && g.current === g.first ? 'Pas d\'attaque au premier tour du joueur qui commence.'
@@ -314,7 +343,7 @@ function renderConsole(ui) {
           <span class="mv-cost">${(a.c ?? []).map(dot).join('') || '<small>Gratuit</small>'}</span>
           ${a.e ? `<small class="mv-text">${esc(a.e)}</small>` : ''}</button>`;
       }).join('') || '<p class="cnote">Cette carte n\'a pas d\'attaque.</p>'}</div>
-      <div class="crow"><button class="cbtn back" data-go="main">← Retour</button></div>`;
+      <div class="crow"><button class="cbtn back" data-go="main">${icon('arrow-left')} Retour</button></div>`;
   } else if (view === 'bag') {
     const actions = legalActions(g);
     const byName = name => actions.filter(a => a.uid != null && card(g, a.uid).name === name);
@@ -324,19 +353,19 @@ function renderConsole(ui) {
         const acts = byName(card(g, uid).name);
         return handCardHtml(ui, uid, acts.length ? ACTION_LABEL[acts[0].type] : '', { playable: acts.length > 0 });
       }).join('') || '<p class="cnote">Ta main est vide.</p>'}</div>
-      <div class="crow"><button class="cbtn back" data-go="main">← Retour</button></div>`;
+      <div class="crow"><button class="cbtn back" data-go="main">${icon('arrow-left')} Retour</button></div>`;
   } else if (view === 'team') {
     body = `
       <div class="cprompt">Ton équipe <small>Banc ${me.bench.length}/5 · Deck ${me.deck.length} · Défausse ${me.discard.length}</small></div>
       <div class="targets">${[me.active ? slotButton(ui, '0|active|0') : '', ...me.bench.map((_, i) => slotButton(ui, `0|bench|${i}`))].join('')}</div>
       <div class="crow">
-        ${canRetreat(g, 0) ? `<button class="cbtn team" data-retreat>↩ Retraite (coût ${retreatCost(g, me.active)})</button>`
+        ${canRetreat(g, 0) ? `<button class="cbtn team" data-retreat>${icon('rotate-ccw')} Retraite (coût ${retreatCost(g, me.active)})</button>`
           : `<span class="cnote">${me.retreated ? 'Déjà battu en retraite ce tour.' : !me.bench.length ? 'Aucun Pokémon sur le Banc.' : `Retraite : il faut ${retreatCost(g, me.active)} Énergie(s) attachée(s).`}</span>`}
-        <button class="cbtn back" data-go="main">← Retour</button></div>`;
+        <button class="cbtn back" data-go="main">${icon('arrow-left')} Retour</button></div>`;
   } else if (view === 'end') {
     body = `
-      <div class="cprompt">${g.winner === 0 ? '🏆 Victoire !' : 'Défaite…'} <small>${esc(tutoie(g.reason))}</small></div>
-      <div class="crow"><a class="cbtn fight" href="#/combat" data-again>⚔ Rejouer</a><a class="cbtn back" href="#/decks/jeu/pokemon">Mes decks</a></div>`;
+      <div class="cprompt">${g.winner === 0 ? `${icon('trophy')} Victoire !` : 'Défaite…'} <small>${esc(tutoie(g.reason))}</small></div>
+      <div class="crow"><a class="cbtn fight" href="#/combat" data-again>${icon('swords')} Rejouer</a><a class="cbtn back" href="#/decks/jeu/pokemon">Mes decks</a></div>`;
   } else {
     const playable = new Set(legalActions(g).filter(a => a.uid != null).map(a => card(g, a.uid).name));
     const nPlay = me.hand.filter(uid => playable.has(card(g, uid).name)).length;
@@ -344,10 +373,10 @@ function renderConsole(ui) {
     body = `
       <div class="cprompt">Que doit faire <b>${esc(me.active ? topCard(g, me.active).name : '…')}</b> ?</div>
       <div class="cmain">
-        <button class="cbtn fight big" data-go="attack"><span class="ci">⚔</span>Attaque<small>${nAtk ? `${nAtk} attaque${nAtk > 1 ? 's' : ''} possible${nAtk > 1 ? 's' : ''}` : 'aucune attaque possible'}</small></button>
-        <button class="cbtn bag" data-go="bag"><span class="ci">🎒</span>Sac<small>${me.hand.length} cartes · ${nPlay} jouable${nPlay > 1 ? 's' : ''}</small></button>
-        <button class="cbtn team" data-go="team"><span class="ci">◓</span>Pokémon<small>Banc ${me.bench.length}/5</small></button>
-        <button class="cbtn run" data-end><span class="ci">⏭</span>Fin du tour<small>Tour ${g.turn}</small></button>
+        <button class="cbtn fight big" data-go="attack"><span class="ci">${icon('swords')}</span>Attaque<small>${nAtk ? `${nAtk} attaque${nAtk > 1 ? 's' : ''} possible${nAtk > 1 ? 's' : ''}` : 'aucune attaque possible'}</small></button>
+        <button class="cbtn bag" data-go="bag"><span class="ci">${icon('backpack')}</span>Sac<small>${me.hand.length} cartes · ${nPlay} jouable${nPlay > 1 ? 's' : ''}</small></button>
+        <button class="cbtn team" data-go="team"><span class="ci">${icon('users')}</span>Pokémon<small>Banc ${me.bench.length}/5</small></button>
+        <button class="cbtn run" data-end><span class="ci">${icon('skip-forward')}</span>Fin du tour<small>Tour ${g.turn}</small></button>
       </div>`;
   }
   ui.root.querySelector('.console').innerHTML = `<div class="cview v-${view}">${fastBtn}${body}</div>`;
@@ -409,8 +438,13 @@ function showEnd(ui) {
   const won = ui.g.winner === 0;
   recordBattle(`pokemon/${ui.level}`, won);
   bgm.stop();
+  const t = ui.trainer;
   ui.arena.querySelector('.overlay').innerHTML = `
-    <div class="bover ${won ? 'win' : 'lose'}"><h2>${won ? '🏆 Victoire !' : 'Défaite…'}</h2><p>${esc(tutoie(ui.g.reason))}</p></div>`;
+    <div class="bover ${won ? 'win' : 'lose'}">
+      <span class="bover-portrait">${portrait(t.look)}</span>
+      <h2>${won ? `${icon('trophy')} Victoire !` : 'Défaite…'}</h2><p>${esc(tutoie(ui.g.reason))}</p>
+      <blockquote><b>${esc(t.full)}</b> « ${esc(won ? t.quotes.lose : t.quotes.win)} »</blockquote>
+    </div>`;
   setTimeout(() => { if (won) { sfx.win(); fx.confettiRain(); fx.flash('#ffd36b', 0.4, 800); } else sfx.lose(); }, 300);
 }
 
@@ -431,7 +465,7 @@ function tutoie(text) {
 async function say(ui, text) {
   const box = ui.root?.querySelector('.msgbox p');
   if (!box) return;
-  text = tutoie(text.replace(/^💥 /, ''));
+  text = tutoie(text);
   ui.skip = false;
   box.parentElement.classList.remove('done');
   for (let i = 1; i <= text.length && !ui.skip && alive(ui); i += 2) {
@@ -500,35 +534,186 @@ function countTo(el, from, to, max, ms) {
   requestAnimationFrame(step);
 }
 
-async function attackAnim(ui, side, before) {
+// ---------- Attaques spectaculaires ----------
+// Chaque type a son effet : un départ (projectile, rayon…) puis un impact sur la cible.
+// La puissance (1 à 3) dépend des dégâts et des cartes ex / V : à 3, plan rapproché sur la carte avant l'attaque.
+
+/** Point de l'écran → repère du terrain (pour les effets posés dans .overlay). */
+function local(ui, p) { const r = ui.arena.getBoundingClientRect(); return { x: p.x - r.left, y: p.y - r.top }; }
+
+function fxEl(ui, cls, style, ms, html = '') {
+  const d = document.createElement('div');
+  d.className = cls; d.style.cssText = style; d.innerHTML = html;
+  ui.arena.querySelector('.overlay').append(d);
+  setTimeout(() => d.remove(), ms);
+  return d;
+}
+const beam = (ui, A, D, color, width, ms = 750) => {
+  const a = local(ui, A), d = local(ui, D);
+  fxEl(ui, 'fx-beam', `left:${a.x}px;top:${a.y}px;width:${Math.hypot(d.x - a.x, d.y - a.y)}px;--w:${width}px;--bc:${color};rotate:${Math.atan2(d.y - a.y, d.x - a.x)}rad`, ms);
+};
+const slash = (ui, D, color, angle, delay = 0) => setTimeout(() => {
+  if (!alive(ui)) return;
+  const d = local(ui, D);
+  fxEl(ui, 'fx-slash', `left:${d.x}px;top:${d.y}px;--bc:${color};rotate:${angle}deg`, 650);
+  sfx.whoosh(0.12);
+}, delay);
+const rings = (D, color, n) => { for (let i = 0; i < n; i++) setTimeout(() => fx.shockwave(D.x, D.y, color, { size: 170 + i * 90, ms: 750 }), i * 140); };
+const quake = ui => { ui.arena.classList.remove('quake'); void ui.arena.offsetWidth; ui.arena.classList.add('quake'); setTimeout(() => ui.arena.classList.remove('quake'), 520); };
+
+const ATTACKS = {
+  Feu: {
+    go: (ui, A, D, p) => fx.travel(A, D, { colors: ['#ff4d1a', '#ffb347', '#ffe08a'], n: 40 + p * 25, size: 5, ms: 380, shapes: ['dot', 'spark'] }),
+    hit: (ui, D, p, h) => {
+      const d = local(ui, D);
+      fxEl(ui, 'fx-flame', `left:${d.x}px;top:${d.y + h * 0.45}px;height:${h * (1.1 + p * 0.3)}px`, 1400);
+      fx.burst(D.x, D.y + h * 0.3, { n: 50 + p * 40, colors: ['#ff4d1a', '#ffb347', '#ffe08a'], speed: 7, gravity: -0.14, angle: -Math.PI / 2, spread: 1.6, shapes: ['spark', 'dot'], life: 75 });
+      if (p >= 2) fx.flash('#ff6b2a', 0.3 + p * 0.1, 500);
+    },
+  },
+  Eau: {
+    go: (ui, A, D, p) => beam(ui, A, D, '#4fb4ff', 12 + p * 9, 850),
+    hit: (ui, D, p) => {
+      fx.burst(D.x, D.y, { n: 50 + p * 35, colors: ['#3e8bff', '#8fd3ff', '#ffffff'], speed: 9, gravity: 0.3, shapes: ['dot'], life: 65 });
+      rings(D, '#8fd3ff', p);
+    },
+  },
+  Électrique: {
+    go: (ui, A, D) => fx.travel(A, D, { colors: ['#fff35c', '#ffffff'], n: 24, size: 3, shapes: ['spark'], ms: 220 }),
+    hit: (ui, D, p) => {
+      const top = ui.arena.getBoundingClientRect().top;
+      for (let i = 0; i < 1 + p; i++) {
+        setTimeout(() => {
+          fx.lightning({ x: D.x + (Math.random() - 0.5) * 160, y: top }, { x: D.x + (Math.random() - 0.5) * 30, y: D.y }, { color: '#fff35c', width: 2 + p });
+          fx.flash('#fff8a0', 0.4, 180);
+          sfx.zap();
+        }, i * 130);
+      }
+      fx.burst(D.x, D.y, { n: 50 + p * 25, colors: ['#fff35c', '#ffffff', '#ffd000'], speed: 12, shapes: ['spark'], life: 38 });
+    },
+  },
+  Plante: {
+    go: (ui, A, D, p) => fx.travel(A, D, { colors: ['#30a46c', '#9be15d', '#e6ffb3'], n: 34 + p * 15, size: 5, shapes: ['confetti', 'star'], ms: 450 }),
+    hit: (ui, D, p) => fx.vortex(D.x, D.y, { colors: ['#30a46c', '#9be15d', '#e6ffb3', '#ffd36b'], n: 50 + p * 35, radius: 120 + p * 30 }),
+  },
+  Psy: {
+    go: (ui, A, D, p) => beam(ui, A, D, '#ff6bd6', 8 + p * 6, 750),
+    hit: (ui, D, p) => {
+      rings(D, '#ff6bd6', 2 + p);
+      ui.arena.classList.add('warp');
+      setTimeout(() => ui.arena.classList.remove('warp'), 1000);
+      fx.burst(D.x, D.y, { n: 40 + p * 25, colors: ['#ff6bd6', '#c58bff', '#ffffff'], speed: 7, shapes: ['star', 'dot'], gravity: 0, life: 70 });
+    },
+  },
+  Combat: {
+    hit: (ui, D, p) => {
+      const d = local(ui, D);
+      fxEl(ui, 'fx-pow', `left:${d.x}px;top:${d.y}px`, 950, `<b>${p >= 3 ? 'BOUM !' : p >= 2 ? 'BAM !' : 'POW !'}</b>`);
+      fx.shockwave(D.x, D.y, '#ffffff', { size: 240 + p * 90 });
+      fx.burst(D.x, D.y, { n: 40 + p * 30, colors: ['#ff9f43', '#ffd36b', '#ffffff'], speed: 10, shapes: ['star', 'spark'], life: 50 });
+      quake(ui);
+    },
+  },
+  Obscurité: {
+    hit: (ui, D, p) => {
+      ui.arena.classList.add('dim');
+      setTimeout(() => ui.arena.classList.remove('dim'), 1000);
+      for (let i = 0; i < 1 + p; i++) slash(ui, D, '#c9b3ff', -40 + i * 45, i * 120);
+      fx.burst(D.x, D.y, { n: 40 + p * 20, colors: ['#8a6bd1', '#3a2a5c', '#c9b3ff'], speed: 4, gravity: -0.05, shapes: ['dot'], life: 80 });
+    },
+  },
+  Métal: {
+    go: (ui, A, D) => fx.travel(A, D, { colors: ['#e4e9f2', '#ffffff'], n: 26, size: 3, shapes: ['spark'], ms: 260 }),
+    hit: (ui, D, p) => {
+      for (let i = 0; i < 1 + p; i++) slash(ui, D, '#ffffff', 35 - i * 50, i * 110);
+      fx.burst(D.x, D.y, { n: 50 + p * 20, colors: ['#e4e9f2', '#95a5a6', '#ffffff', '#ffd36b'], speed: 11, shapes: ['spark'], gravity: 0.35, life: 45 });
+    },
+  },
+  Dragon: {
+    go: (ui, A, D, p) => {
+      const r = ui.arena.getBoundingClientRect();
+      for (let i = 0; i < 3 + p * 2; i++) {
+        setTimeout(() => fx.travel({ x: r.left + Math.random() * r.width * 0.7, y: r.top - 30 }, D, { colors: ['#ffd36b', '#ff6b3d', '#ffffff'], n: 14, size: 5, shapes: ['spark', 'dot'], ms: 120 }), i * 90);
+      }
+    },
+    hit: (ui, D, p) => {
+      fx.burst(D.x, D.y, { n: 80 + p * 40, colors: ['#ffd36b', '#ff6b3d', '#c8a03b', '#ffffff'], speed: 12, shapes: ['star', 'spark'], life: 60 });
+      fx.shockwave(D.x, D.y, '#ffd36b', { size: 320 + p * 80 });
+      fx.flash('#ffb347', 0.35, 500);
+      quake(ui);
+    },
+  },
+  Fée: {
+    go: (ui, A, D, p) => fx.travel(A, D, { colors: ['#ffb3d9', '#ffffff', '#ff8bd4'], n: 30 + p * 15, size: 4, shapes: ['star'], ms: 450 }),
+    hit: (ui, D, p) => {
+      rings(D, '#ffb3d9', p);
+      fx.burst(D.x, D.y, { n: 60 + p * 30, colors: ['#ffb3d9', '#ffffff', '#ff8bd4', '#c58bff'], speed: 8, shapes: ['star'], gravity: 0.05, life: 80 });
+    },
+  },
+  Incolore: {
+    hit: (ui, D, p) => {
+      fx.shockwave(D.x, D.y, '#ffffff', { size: 200 + p * 80 });
+      fx.burst(D.x, D.y, { n: 40 + p * 25, colors: ['#ffffff', '#ffd36b', '#e8e8e8'], speed: 9, shapes: ['star', 'dot'], life: 50 });
+      if (p >= 2) quake(ui);
+    },
+  },
+};
+
+/** Plan rapproché avant une attaque surpuissante : lignes de vitesse, la carte qui traverse, le nom de l'attaque. */
+async function cutIn(ui, c, name, type) {
+  const o = ui.arena.querySelector('.overlay');
+  o.insertAdjacentHTML('beforeend', `
+    <div class="cutin" style="--tc:${TYPE_HEX[type] ?? '#ffffff'}">
+      <div class="ci-lines"></div>
+      <div class="ci-band"><img src="${c.imgHi ?? c.img}" alt=""><b>${esc(name)}</b></div>
+    </div>`);
+  ui.arena.classList.add('cinema');
+  sfx.cutin();
+  await wait(ui, 1400);
+  o.querySelector('.cutin')?.remove();
+  ui.arena.classList.remove('cinema');
+}
+
+async function attackAnim(ui, side, before, atkName) {
   const g = ui.g;
   const att = ui.arena.querySelector(`.fighter.${side ? 'foe' : 'me'}`);
   const def = ui.arena.querySelector(`.fighter.${side ? 'me' : 'foe'}`);
   if (!att) return drain(ui, before);
   const attCard = card(g, +att.dataset.uid);
-  const type = typeOf(attCard), tfx = TYPE_FX[type] ?? TYPE_FX.Incolore;
+  const type = typeOf(attCard), tfx = TYPE_FX[type] ?? TYPE_FX.Incolore, anim = ATTACKS[type] ?? ATTACKS.Incolore;
+  const dmg = def ? (snapshot(g).slots[def.dataset.key]?.damage ?? 0) - (before.slots[def.dataset.key]?.damage ?? 0) : 0;
+  const power = dmg >= 120 || prizeValue(attCard) >= 2 ? 3 : dmg >= 60 ? 2 : 1;
+  if (power >= 3 && atkName) await cutIn(ui, attCard, atkName, type);
   ui.arena.classList.add(side ? 'cam-foe' : 'cam-me');
   await wait(ui, 380);
   att.classList.add('lunge');
   sfx.attack(type);
-  if (def) {
-    const a = fx.center(att.querySelector('.bcard')), d = fx.center(def.querySelector('.bcard'));
-    fx.travel(a, d, { colors: tfx.colors, n: 46, ms: ui.fast ? 200 : 380, size: 4, shapes: tfx.shapes.filter(x => x !== 'confetti').concat('dot') });
-  }
-  await wait(ui, 520);
+  if (def) anim.go?.(ui, fx.center(att.querySelector('.bcard')), fx.center(def.querySelector('.bcard')), power);
+  await wait(ui, power >= 2 ? 650 : 520);
+  // Coupe franche vers la cible (sans transition, comme un changement de plan).
+  ui.arena.classList.add('cut');
   ui.arena.classList.remove('cam-me', 'cam-foe');
   ui.arena.classList.add(side ? 'cam-me' : 'cam-foe');
-  const dmg = def ? (snapshot(g).slots[def.dataset.key]?.damage ?? 0) - (before.slots[def.dataset.key]?.damage ?? 0) : 0;
+  void ui.arena.offsetWidth;
+  requestAnimationFrame(() => ui.arena.classList.remove('cut'));
   if (def && dmg > 0) {
-    const d = fx.center(def.querySelector('.bcard'));
-    fx.shockwave(d.x, d.y, tfx.colors[0], { size: 200 + Math.min(200, dmg * 2) });
-    fx.burst(d.x, d.y, { n: 50 + Math.min(80, dmg), colors: tfx.colors, speed: 9, shapes: tfx.shapes, life: 55 });
-    if (dmg >= 100) { fx.flash(tfx.colors[0], 0.35, 500); ui.arena.classList.add('quake'); setTimeout(() => ui.arena.classList.remove('quake'), 500); }
+    const D = fx.center(def.querySelector('.bcard'));
+    anim.hit(ui, D, power, def.querySelector('.bcard').getBoundingClientRect().height);
+    fx.burst(D.x, D.y, { n: 24, colors: tfx.colors, speed: 9, shapes: tfx.shapes, life: 45 });
     sfx.hit(dmg);
   }
   att.classList.remove('lunge');
   await drain(ui, before);
   ui.arena.classList.remove('cam-me', 'cam-foe');
+}
+
+/** « C'est super efficace ! » en grand sur la cible. */
+function superEffective(ui, side) {
+  const def = ui.arena.querySelector(`.fighter.${side ? 'me' : 'foe'}`);
+  if (!def) return;
+  const d = local(ui, fx.center(def.querySelector('.bcard')));
+  fxEl(ui, 'fx-text', `left:${d.x}px;top:${d.y}px`, 1300, '<b>Super efficace !</b>');
+  sfx.superEff();
 }
 
 async function faint(ui, keys) {
@@ -538,8 +723,15 @@ async function faint(ui, keys) {
     if (!el || el.classList.contains('faint')) continue;
     el.classList.add('faint');
     any = true;
+    const c = fx.center(el.querySelector('.bcard') ?? el);
+    if (el.classList.contains('fighter')) {
+      const d = local(ui, c);
+      fxEl(ui, 'ko-stamp', `left:${d.x}px;top:${d.y}px`, 1300, '<b>K.O.</b>');
+      fx.burst(c.x, c.y, { n: 60, colors: ['#ffffff', '#c9ced9', '#8f96bd'], speed: 8, shapes: ['confetti', 'spark'], gravity: 0.3, life: 70 });
+      fx.flash('#ffffff', 0.3, 400);
+    }
   }
-  if (any) { sfx.faint(); await wait(ui, 1000); }
+  if (any) { sfx.faint(); await wait(ui, 1100); }
 }
 
 async function turnBanner(ui, n, name) {
@@ -583,14 +775,22 @@ async function playback(ui, before, { side = 0, action = null, lines = null } = 
   const after = snapshot(g);
   const gone = Object.keys(before.slots).filter(k => !after.slots[k]);
   let drained = false;
+  let m;
   for (const line of list) {
     if (!alive(ui)) return;
-    let m;
-    if (/ utilise .+ !$/.test(line)) { await say(ui, line); await attackAnim(ui, side, before); drained = true; continue; }
+    if ((m = line.match(/ utilise (.+) !$/))) { await say(ui, line); await attackAnim(ui, side, before, m[1]); drained = true; continue; }
+    if (/super efficace/.test(line)) { superEffective(ui, side); await say(ui, 'C\'est super efficace !'); continue; }
     if (/subit \d+ dégâts de (poison|brûlure)/.test(line)) { await say(ui, line); await drain(ui, before); drained = true; continue; }
-    if (/est K\.O\./.test(line)) { if (!drained) { await drain(ui, before); drained = true; } await faint(ui, gone); await say(ui, line); continue; }
+    if (/est K\.O\./.test(line)) {
+      if (!drained) { await drain(ui, before); drained = true; }
+      await faint(ui, gone);
+      await say(ui, line);
+      // Le Dresseur réagit (pas à chaque fois, pour ne pas se répéter).
+      if (g.winner == null && Math.random() < 0.7) await trainerSay(ui, / Toi prend /.test(line) ? ui.trainer.quotes.ko : ui.trainer.quotes.taunt);
+      continue;
+    }
     if ((m = line.match(/^— Tour (\d+) : (.+) —$/))) { await turnBanner(ui, m[1], m[2]); continue; }
-    if (/^🏆/.test(line)) continue;
+    if (/ gagne \(.+\)\.$/.test(line)) continue; // la fin de partie a son propre écran
     if (/ attache .+ à /.test(line)) energyFly(ui, before, side);
     if (action?.type === 'trainer' && / joue /.test(line)) await trainerShow(ui, action.uid);
     if (/ sur son Banc\.$/.test(line)) sfx.play();
@@ -638,6 +838,10 @@ async function doSetup(ui) {
   ui.busy = true;
   renderConsole(ui);
   const logLen = g.log.length;
+  // Le Dresseur s'efface pour laisser sa carte entrer sur le terrain.
+  ui.arena.classList.add('trainer-out');
+  sfx.whoosh(0.2);
+  await wait(ui, 500);
   setup(g, [ui.setupPick, chooseSetup(g, 1)]);
   ui.setupPick = [];
   renderArena(ui);

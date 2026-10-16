@@ -2,6 +2,7 @@
 import { cloudEnabled, currentUser, pseudo, status, onCloudChange, signIn, signUp, signOut, resetPassword, updatePassword, syncNow } from './cloud.js';
 import { getState } from './store.js';
 import { app, esc } from './ui.js';
+import { icon } from './icons.js';
 
 const timeAgo = t => {
   if (!t) return 'jamais';
@@ -68,7 +69,7 @@ export async function viewAccount() {
         </div>
         <div class="panel">
           <h3>Sauvegarde en ligne</h3>
-          <p>${status.syncing ? '⏳ Synchronisation…' : status.error ? `⚠️ <span class="bad">${esc(status.error)}</span>` : `✅ Collection sauvegardée — ${timeAgo(status.lastSync)}`}</p>
+          <p>${status.syncing ? `${icon('hourglass')} Synchronisation…` : status.error ? `${icon('triangle-alert')} <span class="bad">${esc(status.error)}</span>` : `${icon('circle-check')} Collection sauvegardée — ${timeAgo(status.lastSync)}`}</p>
           <p class="muted">${esc(localSummary())}. Chaque booster ouvert est enregistré automatiquement :
           connecte-toi avec le même compte sur ton téléphone ou un autre ordinateur pour retrouver ta collection.</p>
           <div class="row-btns">

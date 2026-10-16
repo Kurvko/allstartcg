@@ -9,6 +9,7 @@ import { viewPokedex, viewSets, viewCards } from './library.js';
 import { viewBattle } from './battle/battle.js';
 import { sfx, bgm } from './sfx.js';
 import * as fx from './fx.js';
+import { icon } from './icons.js';
 
 const { TIER_COLOR } = fx;
 
@@ -79,7 +80,7 @@ function packHtml(game, set, art, { big = false, img = null } = {}) {
 // Dos de carte : le vrai dos du jeu, sinon un dos dessiné.
 const backFace = game => (game.back
   ? `<div class="face face-back real"><img src="${game.back}" alt=""></div>`
-  : `<div class="face face-back"><span>✦</span><small>${esc(game.short ?? game.name)}</small></div>`);
+  : `<div class="face face-back">${icon('sparkles')}<small>${esc(game.short ?? game.name)}</small></div>`);
 
 const dots = gameId => `<span class="dots" data-game="${gameId}">${dotsInner(gameId)}</span>`;
 const dotsInner = gameId => {
@@ -98,8 +99,8 @@ function cardThumb(card, count, { missing = false, setKey = '' } = {}) {
 }
 
 // Petite étoile sur les vignettes des cartes favorites.
-const favBadge = (setKey, id) => `<span class="fav-badge" data-fav="${esc(setKey)}|${esc(id)}" ${setKey && isFav(setKey, id) ? '' : 'hidden'}>★</span>`;
-const favButton = on => (on ? '★ Dans tes favoris' : '☆ Ajouter aux favoris');
+const favBadge = (setKey, id) => `<span class="fav-badge" data-fav="${esc(setKey)}|${esc(id)}" ${setKey && isFav(setKey, id) ? '' : 'hidden'}>${icon('star', { fill: true })}</span>`;
+const favButton = on => (on ? `${icon('star', { fill: true })} Dans tes favoris` : `${icon('star')} Ajouter aux favoris`);
 
 function openModal(card, game, count, setKey) {
   modal.innerHTML = `
@@ -122,7 +123,7 @@ function openModal(card, game, count, setKey) {
   modal.querySelector('[data-fav-toggle]')?.addEventListener('click', e => {
     const on = toggleFav(setKey, card.id);
     e.currentTarget.classList.toggle('on', on);
-    e.currentTarget.textContent = favButton(on);
+    e.currentTarget.innerHTML = favButton(on);
     document.querySelectorAll(`.fav-badge[data-fav="${CSS.escape(`${setKey}|${card.id}`)}"]`).forEach(b => { b.hidden = !on; });
   });
 }
@@ -164,7 +165,7 @@ async function viewHome() {
             <div>${countdown()}<span>prochain booster</span></div>
           </div>
           <div class="hero-cta">
-            <button class="btn primary big" data-random ${leftNow ? '' : 'disabled'}>✦ Ouvrir un booster au hasard</button>
+            <button class="btn primary big" data-random ${leftNow ? '' : 'disabled'}>${icon('shuffle')} Ouvrir un booster au hasard</button>
             <a class="btn ghost" href="#/collection">Ma collection</a>
           </div>
         </div>
@@ -193,7 +194,7 @@ async function viewHome() {
           <h2><a href="#/game/${game.id}">${esc(game.name)}</a></h2>
           ${dots(game.id)}
           <span class="muted">${stockLine(game.id)}</span>
-          <a class="see-all" href="#/game/${game.id}">${sets.length} set${sets.length > 1 ? 's' : ''} →</a>
+          <a class="see-all" href="#/game/${game.id}">${sets.length} set${sets.length > 1 ? 's' : ''}</a>
         </div>
         <div class="set-row ${game.tileStyle === 'logo' ? 'logos' : ''}">
           ${shown.map(set => setTile(game, set, byKey[`${game.id}/${set.id}`])).join('')}
@@ -273,7 +274,7 @@ async function viewGame(gameId) {
 
   app.innerHTML = `
     <section class="page" style="--c:${game.color};--a:${game.accent}">
-      <a href="#/" class="back">← Tous les jeux</a>
+      <a href="#/" class="back">Tous les jeux</a>
       <div class="page-head">
         <div><h1>${esc(game.name)}</h1><p class="muted">${game.sets.length} sets · boosters : ${stockLine(game.id)}</p></div>
         <input class="search" type="search" placeholder="Rechercher un set…" aria-label="Rechercher un set">
@@ -313,7 +314,7 @@ async function viewOpen(setKey) {
   app.innerHTML = `
     <section class="open" style="--c:${game.color};--a:${game.accent}">
       <div class="open-head">
-        <a href="#/game/${game.id}" class="back">← ${esc(game.short ?? game.name)}</a>
+        <a href="#/game/${game.id}" class="back">${esc(game.short ?? game.name)}</a>
         <div><h1>${esc(set.name)}</h1><p class="muted">${esc(game.name)} · ${set.year} · ${data.cards.length} cartes · carte phare : ${esc(chase.name)}${chase.price == null ? ` (${esc(RARITY_LABEL(chase.rarity))})` : ` (${fmt(chase.price)})`}</p></div>
         <div class="open-quota"></div>
       </div>
@@ -339,7 +340,7 @@ async function viewOpen(setKey) {
         <div class="pack-stage" data-wait="${game.id}">
           ${packHtml(game, set, chase.img, { big: true, img: packImg() })}
           <div class="limit">
-            <h3>Plus de booster pour l'instant ⏳</h3>
+            <h3>${icon('hourglass')} Plus de booster pour l'instant</h3>
             <p>Ton prochain booster ${esc(game.name)} arrive dans ${countdown(game.id)}.</p>
             <p class="muted">Un booster se recharge toutes les ${REFILL_LABEL}, jusqu'à ${MAX_PACKS} en stock. En attendant, ouvre ceux des autres jeux ou admire ta collection.</p>
             <div class="row"><a class="btn" href="#/collection/${setKey}">Voir ma collection</a><a class="btn ghost" href="#/">Autres jeux</a></div>
@@ -362,13 +363,13 @@ async function viewOpen(setKey) {
               <div class="p-cut"><i></i></div>
               <div class="p-light"><i></i></div>
             </div>
-            <div class="p-back">${img ? `<img src="${img}" alt="">` : ''}<span>✦</span></div>
+            <div class="p-back">${img ? `<img src="${img}" alt="">` : ''}<span>${icon('sparkles')}</span></div>
           </div>
         </div>
         <div class="stack"></div>
       </div>
       <div class="open-actions">
-        <button class="btn primary big" data-open>✂ Ouvrir le booster</button>
+        <button class="btn primary big" data-open>${icon('scissors')} Ouvrir le booster</button>
         <p class="muted hint">Glisse le long du haut du booster pour le déchirer · ou appuie sur Espace</p>
       </div>`;
     sfx.packIn();
@@ -551,7 +552,7 @@ async function viewOpen(setKey) {
       celebrate(el, c.tier);
       if (c.tier >= 2) stack.dataset.glow = c.tier;
       await sleep(200);
-      label.innerHTML = `<span>${esc(RARITY_LABEL(c.rarity))}</span><b>${priceTag(c.price)}</b>${isNew(current) ? '<em>✦ Nouvelle carte</em>' : ''}`;
+      label.innerHTML = `<span>${esc(RARITY_LABEL(c.rarity))}</span><b>${priceTag(c.price)}</b>${isNew(current) ? `<em>${icon('sparkles')} Nouvelle carte</em>` : ''}`;
       label.className = `scard-label tier-${c.tier}`;
       label.hidden = false;
       if (isNew(current)) setTimeout(() => sfx.newCard(), 150);
@@ -587,7 +588,7 @@ async function viewOpen(setKey) {
                   <div class="face front tilt">${cardArt(c, { lazy: false })}<div class="shine"></div></div>
                 </div>
                 <div class="flip-label"><span>${esc(RARITY_LABEL(c.rarity))}</span><b>${priceTag(c.price)}</b></div>
-                <div class="flip-tags">${i === bestI ? '<span class="best-tag">★ Meilleure</span>' : ''}${isNew(i) ? '<span class="new">✦ Nouveau</span>' : ''}</div>
+                <div class="flip-tags">${i === bestI ? `<span class="best-tag">${icon('crown')} Meilleure</span>` : ''}${isNew(i) ? `<span class="new">${icon('sparkles')} Nouveau</span>` : ''}</div>
               </div>`).join('')}
           </div>
           <div class="reveal-bar">
@@ -670,7 +671,7 @@ async function viewCollection() {
   app.innerHTML = `
     <section class="page">
       <h1>Ma collection</h1>
-      <p class="muted">${count} cartes · valeur totale <b class="accent">${fmt(value)}</b> · <a class="accent" href="#/favoris">★ Mes favoris (${getFavorites().length})</a></p>
+      <p class="muted">${count} cartes · valeur totale <b class="accent">${fmt(value)}</b> · <a class="accent" href="#/favoris">${icon('star', { fill: true })} Mes favoris (${getFavorites().length})</a></p>
       ${GAMES.map(game => {
         const mine = rows.filter(r => r.game === game && r.unique > 0).sort((a, b) => b.value - a.value);
         if (!mine.length) return '';
@@ -687,7 +688,7 @@ async function viewCollection() {
               </div>
             </a>`).join('')}
           </div>`;
-      }).join('') || '<p>Ta collection est vide. <a class="accent" href="#/">Ouvre ton premier booster →</a></p>'}
+      }).join('') || '<p>Ta collection est vide. <a class="accent arrow" href="#/">Ouvre ton premier booster</a></p>'}
     </section>`;
 }
 
@@ -701,17 +702,17 @@ async function viewCollectionSet(setKey) {
 
   app.innerHTML = `
     <section class="page" style="--c:${game.color};--a:${game.accent}">
-      <a href="#/collection" class="back">← Collection</a>
+      <a href="#/collection" class="back">Collection</a>
       <div class="page-head">
         <div><h1>${esc(set.name)}</h1><p class="muted summary-line"></p></div>
         <a class="btn primary" href="#/open/${setKey}">Ouvrir un booster</a>
       </div>
       <div class="toolbar">
         <div class="seg" data-filter>
-          <button data-v="all" class="on">Toutes</button><button data-v="owned">Possédées</button><button data-v="missing">Manquantes</button><button data-v="fav">★ Favoris</button>
+          <button data-v="all" class="on">Toutes</button><button data-v="owned">Possédées</button><button data-v="missing">Manquantes</button><button data-v="fav">${icon('star', { fill: true })} Favoris</button>
         </div>
         <select data-sort>
-          <option value="num">Numéro</option><option value="price">Prix ↓</option><option value="tier">Rareté ↓</option>
+          <option value="num">Numéro</option><option value="price">Prix décroissant</option><option value="tier">Rareté décroissante</option>
         </select>
       </div>
       <div class="grid"></div>
@@ -830,9 +831,9 @@ async function viewFavorites() {
   const byGame = GAMES.map(g => [g, items.filter(x => x.game === g)]).filter(([, list]) => list.length);
   app.innerHTML = `
     <section class="page favorites">
-      <a href="#/collection" class="back">← Collection</a>
-      <h1>★ Mes favoris</h1>
-      <p class="muted">${items.length ? `${items.length} carte${items.length > 1 ? 's' : ''} · ` : ''}Ouvre une carte et clique sur « ☆ Ajouter aux favoris » pour la retrouver ici, que tu l'aies déjà ou que tu la chasses encore.</p>
+      <a href="#/collection" class="back">Collection</a>
+      <h1>${icon('star', { fill: true })} Mes favoris</h1>
+      <p class="muted">${items.length ? `${items.length} carte${items.length > 1 ? 's' : ''} · ` : ''}Ouvre une carte et clique sur « Ajouter aux favoris » pour la retrouver ici, que tu l'aies déjà ou que tu la chasses encore.</p>
       ${byGame.map(([game, list]) => `
         <h2 class="game-title" style="--c:${game.color}">${esc(game.name)}</h2>
         <div class="grid">${list.map(x => {

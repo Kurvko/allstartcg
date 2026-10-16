@@ -3,6 +3,7 @@ import { GAMES, findSet } from './catalog.js';
 import { loadIndex } from './data.js';
 import { getState, isFav } from './store.js';
 import { app, esc, fmt, versioned, cardArt } from './ui.js';
+import { icon } from './icons.js';
 
 const PAGE = 120;
 const cache = new Map();
@@ -45,7 +46,7 @@ function thumb(c) {
     <button class="thumb tier-${c.tier} ${c.owned ? '' : 'missing'}" data-key="${esc(c.setKey)}|${esc(c.i)}">
       ${cardArt(asCard(c))}
       ${c.owned > 1 ? `<span class="count">×${c.owned}</span>` : ''}
-      <span class="fav-badge" data-fav="${esc(c.setKey)}|${esc(c.i)}" ${isFav(c.setKey, c.i) ? '' : 'hidden'}>★</span>
+      <span class="fav-badge" data-fav="${esc(c.setKey)}|${esc(c.i)}" ${isFav(c.setKey, c.i) ? '' : 'hidden'}>${icon('star', { fill: true })}</span>
       <span class="thumb-info"><span>${esc(c.n)}</span><b>${fmt(c.p)}</b></span>
     </button>`;
 }
@@ -157,7 +158,7 @@ async function viewPokemon(n, openModal) {
 
   app.innerHTML = `
     <section class="page mon-page" style="--c:#ffcb05;--a:#3d7dca">
-      <a href="#/pokedex" class="back">← Pokédex</a>
+      <a href="#/pokedex" class="back">Pokédex</a>
       <div class="mon-head">
         <img class="mon-art" src="${artwork(n)}" alt="${esc(name)}">
         <div>
@@ -168,8 +169,8 @@ async function viewPokemon(n, openModal) {
             <div><span>Valeur</span><b>${fmt(value)}</b></div>
           </div>
           <p class="mon-nav">
-            ${prev ? `<a class="btn ghost" href="#/pokedex/${prev[0]}">← ${esc(prev[1])}</a>` : ''}
-            ${next ? `<a class="btn ghost" href="#/pokedex/${next[0]}">${esc(next[1])} →</a>` : ''}
+            ${prev ? `<a class="btn ghost" href="#/pokedex/${prev[0]}">${icon('arrow-left')} ${esc(prev[1])}</a>` : ''}
+            ${next ? `<a class="btn ghost" href="#/pokedex/${next[0]}">${esc(next[1])} ${icon('arrow-right')}</a>` : ''}
           </p>
         </div>
       </div>
@@ -221,7 +222,7 @@ export async function viewSets(gameId) {
             <a class="set-line ${pct === 100 ? 'done' : ''}" href="#/collection/${key}">
               <span class="set-logo ${set.logo ? 'light' : game.id === 'pokemon' ? '' : 'pack'}">${img ? `<img src="${img}" alt="" loading="lazy">` : ''}</span>
               <span class="set-meta"><b>${esc(set.name)}</b><small class="muted">${set.date ? new Date(set.date).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) : set.year} · ${t} cartes</small></span>
-              <span class="set-prog"><span>${n} / ${t}${pct === 100 ? ' ✓' : ''}</span><span class="progress"><i style="width:${pct}%"></i></span></span>
+              <span class="set-prog"><span>${n} / ${t}${pct === 100 ? ` ${icon('check')}` : ''}</span><span class="progress"><i style="width:${pct}%"></i></span></span>
             </a>`;
         }).join('')}</div>`).join('')}
     </section>`;
@@ -251,7 +252,7 @@ export async function viewCards(gameId, { openModal } = {}) {
         <select data-sel="set"><option value="all">Tous les sets</option>${[...game.sets].reverse().map(s => `<option value="${esc(s.id)}" ${cardState.set === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
         <select data-sel="rarity"><option value="all">Toutes les raretés</option>${rarities.map(r => `<option ${cardState.rarity === r ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select>
         <select data-sel="sort">
-          ${[['price', 'Prix décroissant'], ['price-asc', 'Prix croissant'], ['new', 'Plus récentes'], ['old', 'Plus anciennes'], ['name', 'Nom (A → Z)']].map(([v, l]) => `<option value="${v}" ${cardState.sort === v ? 'selected' : ''}>${l}</option>`).join('')}
+          ${[['price', 'Prix décroissant'], ['price-asc', 'Prix croissant'], ['new', 'Plus récentes'], ['old', 'Plus anciennes'], ['name', 'Nom (A à Z)']].map(([v, l]) => `<option value="${v}" ${cardState.sort === v ? 'selected' : ''}>${l}</option>`).join('')}
         </select>
       </div>
       <div class="toolbar">${segHtml('show', [['all', 'Toutes'], ['owned', 'Possédées'], ['missing', 'Manquantes']], cardState.show)}<span class="muted result-count"></span></div>

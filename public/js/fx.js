@@ -91,7 +91,9 @@ function loop(now) {
     const p = parts[i];
     p.life -= k;
     if (p.life <= 0) { parts.splice(i, 1); continue; }
-    if (p.target) { // aspiration vers un point (charge d'une carte rare)
+    if (p.target) { // aspiration vers un point (charge d'une carte rare), avec un éventuel élan (tourbillon)
+      p.vx *= p.drag ** k; p.vy *= p.drag ** k;
+      p.x += p.vx * k; p.y += p.vy * k;
       const pull = Math.min(1, (p.pull ?? 0.06) * k);
       p.x += (p.target.x - p.x) * pull; p.y += (p.target.y - p.y) * pull;
     } else {
@@ -103,7 +105,17 @@ function loop(now) {
     og.globalAlpha = Math.min(1, t * 2);
     og.fillStyle = og.strokeStyle = p.color;
     og.globalCompositeOperation = p.shape === 'confetti' ? 'source-over' : 'lighter';
-    if (p.shape === 'spark') {
+    if (p.shape === 'bolt') {
+      // Éclair : ligne brisée redessinée régulièrement pour qu'il crépite.
+      if (!p.pts || Math.random() < 0.35) p.pts = boltPoints(p.from, p.to);
+      og.shadowColor = p.color; og.shadowBlur = 22;
+      og.lineCap = 'round'; og.lineJoin = 'round';
+      for (const [w, c] of [[p.size + 4, p.color], [p.size * 0.6, '#ffffff']]) {
+        og.lineWidth = w; og.strokeStyle = c;
+        og.beginPath(); p.pts.forEach(([x, y], i) => (i ? og.lineTo(x, y) : og.moveTo(x, y))); og.stroke();
+      }
+      og.shadowBlur = 0;
+    } else if (p.shape === 'spark') {
       og.lineWidth = p.size * t + 0.5;
       og.beginPath(); og.moveTo(p.x, p.y); og.lineTo(p.x - p.vx * 2.6, p.y - p.vy * 2.6); og.stroke();
     } else if (p.shape === 'star') {
@@ -130,6 +142,29 @@ function spawn(p) {
 }
 
 const pick = list => list[Math.floor(Math.random() * list.length)];
+
+function boltPoints(a, b, seg = 12) {
+  const len = Math.hypot(b.x - a.x, b.y - a.y), nx = -(b.y - a.y) / len, ny = (b.x - a.x) / len;
+  return Array.from({ length: seg + 1 }, (_, i) => {
+    const t = i / seg, off = i && i < seg ? rnd(-1, 1) * len * 0.07 : 0;
+    return [a.x + (b.x - a.x) * t + nx * off, a.y + (b.y - a.y) * t + ny * off];
+  });
+}
+
+/** Éclair entre deux points de l'écran. */
+export function lightning(from, to, { color = '#fff35c', life = 18, width = 3 } = {}) {
+  spawn({ x: 0, y: 0, vx: 0, vy: 0, gravity: 0, drag: 1, life, color, size: width, shape: 'bolt', from, to });
+}
+
+/** Tourbillon de particules qui s'enroulent vers un point. */
+export function vortex(x, y, { colors = ['#fff'], n = 60, radius = 150, shapes = ['confetti', 'star'] } = {}) {
+  if (reduced) n = Math.min(n, 12);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU * 2, d = radius * rnd(0.6, 1.1);
+    spawn({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d, vx: -Math.sin(a) * 7, vy: Math.cos(a) * 7, drag: 0.95, life: rnd(40, 60),
+      color: pick(colors), size: rnd(3, 5), shape: pick(shapes), pull: 0.05, target: { x, y } });
+  }
+}
 
 /** Explosion de particules autour d'un point de l'écran. */
 export function burst(x, y, { n = 60, colors = ['#fff'], speed = 9, gravity = 0.18, life = 70, size = 3, shapes = ['spark', 'dot'], angle = -Math.PI / 2, spread = TAU, drag = 0.95 } = {}) {

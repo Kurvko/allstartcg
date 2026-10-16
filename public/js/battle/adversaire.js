@@ -1,4 +1,4 @@
-// IA du combat Pokémon, 3 niveaux :
+// Adversaire du combat Pokémon (le Dresseur), 3 niveaux :
 // - facile : coups au hasard, attaque quand elle peut ;
 // - normal : teste chaque coup sur une copie de la partie et garde le meilleur, avec des erreurs de temps en temps ;
 // - difficile : comme normal, sans erreur, et en regardant aussi ce que l'adversaire pourra faire au tour suivant.
@@ -73,7 +73,7 @@ function threat(g, side) {
 
 function scoreAction(g, side, action, level) {
   const sim = clone(g);
-  // L'IA ne connaît pas l'ordre de son deck : on le mélange dans la copie.
+  // L'adversaire ne connaît pas l'ordre de son deck : on le mélange dans la copie.
   sim.players[side].deck.sort(() => Math.random() - 0.5);
   if (action.type === 'end') {
     // Fin du tour : on évalue la position actuelle (pas de pioche adverse simulée).
@@ -107,7 +107,7 @@ function autoPromote(g) {
   }
 }
 
-/** Choisit la prochaine action de l'IA (side) au niveau donné. */
+/** Choisit la prochaine action de l'adversaire (side) au niveau donné. */
 export function chooseAction(g, side, levelKey = 'normal') {
   const level = LEVELS[levelKey] ?? LEVELS.normal;
   const actions = legalActions(g);
@@ -136,7 +136,7 @@ export function chooseAction(g, side, levelKey = 'normal') {
   return best;
 }
 
-/** Mise en place de l'IA : le Pokémon de base le plus solide en Actif, les autres sur le Banc. */
+/** Mise en place de l'adversaire : le Pokémon de base le plus solide en Actif, les autres sur le Banc. */
 export function chooseSetup(g, side) {
   const p = g.players[side];
   const basics = p.hand.filter(uid => isBasic(card(g, uid)))

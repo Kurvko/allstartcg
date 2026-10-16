@@ -1,4 +1,4 @@
-// Construction de decks de 60 cartes pour le combat : decks de l'IA et deck de démo.
+// Construction de decks de 60 cartes pour le combat : decks des Dresseurs adverses et deck de démo.
 import { trainerEffect } from './effects.js';
 
 const norm = s => (s ?? '').toLowerCase().replace(/\s+/g, ' ').trim();

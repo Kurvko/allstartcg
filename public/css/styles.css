@@ -1172,7 +1172,10 @@ main, .footer { position: relative; z-index: 1; }
 @keyframes shine-sweep { from { background-position: 150% 0; } to { background-position: -150% 0; } }
 .fshadow { position: absolute; left: 50%; bottom: -7%; width: 120%; height: 16%; translate: -50% 0; border-radius: 50%; background: radial-gradient(closest-side, #000a, transparent); }
 .fighter.target .bcard { box-shadow: 0 0 0 4px #ffd36b, 0 0 34px #ffd36b; }
-.fighter.target::after { content: '▼'; position: absolute; left: 50%; top: -26px; translate: -50% 0; color: #ffd36b; font-size: 20px; text-shadow: 0 2px 4px #000a; animation: bob .6s infinite alternate; }
+.fighter.target::after {
+  content: ''; position: absolute; left: 50%; top: -24px; translate: -50% 0; border: 10px solid transparent; border-top: 13px solid #ffd36b;
+  filter: drop-shadow(0 2px 3px #000a); animation: bob .6s infinite alternate;
+}
 /* États spéciaux : la carte est tournée comme sur une vraie table */
 .fighter.st-sleep .bcard { rotate: -90deg; scale: .74; }
 .fighter.st-paralysis .bcard { rotate: 90deg; scale: .74; }
@@ -1274,7 +1277,7 @@ main, .footer { position: relative; z-index: 1; }
   background: linear-gradient(#2d3354f4, #161a2ef4); border: 2px solid #ffffff38; box-shadow: 0 10px 30px -10px #000, inset 0 1px 0 #ffffff22;
 }
 .msgbox p { margin: 0; }
-.msgbox i { position: absolute; right: 16px; bottom: 9px; font-style: normal; font-size: 12px; color: #ffd36b; opacity: 0; }
+.msgbox i { position: absolute; right: 14px; bottom: 6px; font-style: normal; color: #ffd36b; opacity: 0; display: grid; }
 .msgbox.done i { opacity: 1; animation: bob .6s infinite alternate; }
 @keyframes bob { to { translate: 0 3px; } }
 .overlay { position: absolute; inset: 0; z-index: 8; pointer-events: none; }
@@ -1381,3 +1384,159 @@ main, .footer { position: relative; z-index: 1; }
   .cprompt { font-size: 14px; }
   .console .hcard { width: 64px; }
 }
+
+/* ---------- Icônes (icons.js, Lucide) ---------- */
+.ic { width: 1.1em; height: 1.1em; flex: none; vertical-align: -.18em; }
+.btn .ic, .cbtn .ic, .seg .ic { vertical-align: -.2em; }
+.theme-btn .ic { width: 17px; height: 17px; }
+.theme-btn .t-light, .theme-btn .t-dark, :root[data-theme-pref="light"] .theme-btn .t-auto, :root[data-theme-pref="dark"] .theme-btn .t-auto { display: none; }
+:root[data-theme-pref="light"] .theme-btn .t-light, :root[data-theme-pref="dark"] .theme-btn .t-dark { display: block; }
+.fav-badge .ic { width: 13px; height: 13px; }
+.face.face-back .ic { width: 42px; height: 42px; filter: drop-shadow(0 0 14px var(--c)); }
+.p-back span .ic { width: 60px; height: 60px; }
+/* Flèches des liens « retour » et « voir plus » */
+.back::before, .see-all::after, .accent.arrow::after {
+  content: ''; display: inline-block; width: 1em; height: 1em; vertical-align: -.15em; background: currentColor;
+  -webkit-mask: var(--arrow) center / contain no-repeat; mask: var(--arrow) center / contain no-repeat;
+}
+.back::before { margin-right: 6px; --arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m12 19-7-7 7-7'/%3E%3Cpath d='M19 12H5'/%3E%3C/svg%3E"); }
+.see-all::after, .accent.arrow::after { margin-left: 5px; --arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14'/%3E%3Cpath d='m12 5 7 7-7 7'/%3E%3C/svg%3E"); }
+
+/* =====================================================================
+   Combat : Dresseurs et attaques spectaculaires
+   ===================================================================== */
+.cbtn .ci .ic { width: 24px; height: 24px; }
+.hb-tool { display: inline-grid; color: #5a6280; }
+.hb-tool .ic { width: 13px; height: 13px; }
+/* Choix du niveau : portraits des Dresseurs */
+.pick-trainers { display: flex; margin-bottom: 4px; }
+.mini-portrait {
+  width: 40px; height: 48px; margin-right: -8px; border-radius: 10px; overflow: hidden; flex: none;
+  background: linear-gradient(160deg, #ffffff22, #ffffff08); box-shadow: 0 0 0 2px var(--panel);
+}
+.mini-portrait svg { width: 100%; height: 100%; display: block; }
+
+/* Le Dresseur sur sa plateforme, avant d'envoyer sa carte */
+.trainer-stand {
+  position: absolute; left: 70%; bottom: 46%; height: 40%; aspect-ratio: 200 / 240; translate: 60% 0; opacity: 0; z-index: 2;
+  transition: translate .7s cubic-bezier(.2, .9, .3, 1), opacity .5s;
+  -webkit-mask-image: linear-gradient(#000 70%, transparent 98%); mask-image: linear-gradient(#000 70%, transparent 98%);
+}
+.trainer-stand svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 10px 14px #0007); }
+.arena.trainer-in .trainer-stand { translate: -50% 0; opacity: 1; }
+.arena.trainer-out .trainer-stand { translate: 80% 0; opacity: 0; transition-duration: .45s; }
+/* Écran de face-à-face */
+.vs { position: absolute; inset: 0; z-index: 20; display: grid; grid-template-columns: 1fr 1fr; overflow: hidden; background: #0b0d17; }
+.vs-side { position: relative; display: grid; place-items: center; align-content: center; gap: 4px; color: #fff; text-align: center; }
+.vs-side.me { background: linear-gradient(135deg, #2f6fe0, #10204a); clip-path: polygon(0 0, 100% 0, 88% 100%, 0 100%); animation: vs-left .55s cubic-bezier(.2, .9, .3, 1) both; }
+.vs-side.foe {
+  margin-left: -12%; background: linear-gradient(225deg, var(--tc), color-mix(in srgb, var(--tc) 35%, #0b0d17)); clip-path: polygon(12% 0, 100% 0, 100% 100%, 0 100%);
+  animation: vs-right .55s .1s cubic-bezier(.2, .9, .3, 1) both;
+}
+.vs-side svg { width: min(220px, 60%); height: auto; filter: drop-shadow(0 12px 18px #0008); }
+.vs-side b { font: 800 clamp(18px, 3.4vw, 30px) var(--display); text-shadow: 0 3px 0 #0006; }
+.vs-side small { color: #ffffffb0; font: 700 12px Inter; letter-spacing: .14em; text-transform: uppercase; }
+.vs-side::before { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(115deg, #ffffff10 0 2px, transparent 2px 22px); animation: vs-lines 1.2s linear infinite; }
+.vs-mark {
+  position: absolute; left: 50%; top: 50%; translate: -50% -50%; z-index: 2; font: 800 clamp(48px, 9vw, 96px) var(--display); color: #ffd36b;
+  -webkit-text-stroke: 3px #1b1530; text-shadow: 0 6px 0 #1b1530, 0 0 40px #ffd36b; animation: vs-mark .5s .45s cubic-bezier(.3, 1.6, .5, 1) both;
+}
+.vs.out { animation: vs-out .45s ease-in forwards; }
+@keyframes vs-left { from { translate: -100% 0; } }
+@keyframes vs-right { from { translate: 100% 0; } }
+@keyframes vs-lines { to { background-position: 44px 0; } }
+@keyframes vs-mark { from { scale: 4; opacity: 0; } }
+@keyframes vs-out { to { opacity: 0; scale: 1.15; } }
+/* Bulle du Dresseur */
+.tspeech {
+  position: absolute; right: 3%; top: 4%; z-index: 9; display: flex; align-items: center; gap: 8px; padding: 4px 14px 4px 4px; border-radius: 99px;
+  background: #ffffffee; color: #1a1f33; font: 800 14px var(--display); box-shadow: 0 10px 24px -10px #000a; animation: tspeech .4s cubic-bezier(.2, .9, .3, 1.3);
+}
+.tspeech .tp { width: 54px; height: 54px; border-radius: 50%; overflow: hidden; background: color-mix(in srgb, var(--rim) 40%, #fff); flex: none; }
+.tspeech .tp svg { width: 100%; height: 100%; display: block; scale: 1.35; translate: 0 12%; }
+.tspeech.out { animation: tspeech .3s reverse forwards; }
+@keyframes tspeech { from { opacity: 0; translate: 30px 0; scale: .8; } }
+/* Fin de partie : le Dresseur et sa réplique */
+.bover-portrait { width: 130px; margin: 0 auto -6px; filter: drop-shadow(0 10px 20px #000a); animation: mini-in .6s cubic-bezier(.2, .9, .3, 1.3); }
+.bover-portrait svg { width: 100%; height: auto; display: block; }
+.bover blockquote { margin: 6px auto 0; max-width: 420px; padding: 8px 14px; border-radius: 12px; background: #ffffff14; color: #eef0ff; font-size: 14px; }
+.bover blockquote b { color: #ffd36b; margin-right: 4px; }
+.bover h2 .ic { width: .8em; height: .8em; }
+
+/* Carte ex / V / VMAX : aura permanente */
+.fighter.ex .bcard { box-shadow: 0 16px 26px -10px #000b, 0 0 0 2px #ffffffaa, 0 0 26px 4px #ffd36baa; }
+.fighter.ex::before {
+  content: ''; position: absolute; inset: -12% -16%; z-index: -1; border-radius: 40%; pointer-events: none;
+  background: conic-gradient(from 0deg, #ff6b8b55, #ffd36b77, #7dffb055, #6bc8ff77, #b98bff55, #ff6b8b55); filter: blur(14px);
+  animation: spin 4s linear infinite;
+}
+
+/* Caméra : coupe franche, assombrissement, distorsion Psy, bandes cinéma */
+.arena.cut .world { transition: none; }
+.arena.dim .world { filter: brightness(.45) saturate(.7); transition: filter .2s; }
+.arena.warp .world { animation: warp 1s ease-in-out; }
+@keyframes warp { 30% { filter: hue-rotate(80deg) saturate(1.6); scale: 1.03; } 60% { filter: hue-rotate(-60deg) saturate(1.4); scale: .99; } }
+.arena::before, .arena::after {
+  content: ''; position: absolute; left: 0; right: 0; height: 0; z-index: 15; background: #000; transition: height .35s cubic-bezier(.2, .8, .2, 1); pointer-events: none;
+}
+.arena::before { top: 0; } .arena::after { bottom: 0; }
+.arena.cinema::before, .arena.cinema::after { height: 11%; }
+
+/* Plan rapproché d'une attaque surpuissante */
+.cutin { position: absolute; inset: 0; z-index: 14; overflow: hidden; animation: fade .2s; }
+.ci-lines {
+  position: absolute; inset: -50%; animation: spin 2.5s linear infinite;
+  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--tc) 80%, #fff) 0 2deg, transparent 2deg 9deg), radial-gradient(circle, transparent 18%, #000c 70%);
+}
+.ci-band {
+  position: absolute; left: -5%; right: -5%; top: 50%; height: 46%; translate: 0 -50%; rotate: -6deg; display: flex; align-items: center; gap: 4%; padding: 0 10%;
+  background: linear-gradient(90deg, #0b0d17ee, color-mix(in srgb, var(--tc) 70%, #0b0d17) 60%, #0b0d17ee); box-shadow: 0 0 0 4px #fff, 0 0 40px var(--tc);
+  animation: ci-band 1.4s cubic-bezier(.2, .9, .3, 1) both;
+}
+.ci-band img { height: 118%; aspect-ratio: 63 / 88; border-radius: 4%; box-shadow: 0 0 0 3px #fff, 0 20px 40px #000; animation: ci-card 1.4s cubic-bezier(.15, .9, .3, 1) both; }
+.ci-band b {
+  font: 800 clamp(26px, 5.5vw, 58px)/1 var(--display); color: #fff; text-transform: uppercase; letter-spacing: .02em;
+  -webkit-text-stroke: 2px #1b1530; text-shadow: 0 5px 0 #1b1530, 0 0 30px var(--tc); animation: ci-name 1.4s cubic-bezier(.2, .9, .3, 1) both;
+}
+@keyframes ci-band { from { scale: 1 0; } 12% { scale: 1 1; } 88% { scale: 1 1; opacity: 1; } to { scale: 1.1 0; opacity: 0; } }
+@keyframes ci-card { from { translate: -120% 0; } 25%, 80% { translate: 0 0; } to { translate: 40% 0; } }
+@keyframes ci-name { from { translate: 60% 0; opacity: 0; } 30%, 85% { translate: 0 0; opacity: 1; } to { translate: -20% 0; opacity: 0; } }
+
+/* Effets posés sur le terrain */
+.fx-beam {
+  position: absolute; height: var(--w); margin-top: calc(var(--w) / -2); transform-origin: 0 50%; z-index: 4; pointer-events: none; border-radius: 99px;
+  background: linear-gradient(90deg, transparent, var(--bc) 15%, #fff 50%, var(--bc) 85%, transparent);
+  box-shadow: 0 0 20px var(--bc), 0 0 40px var(--bc); mix-blend-mode: screen; animation: fx-beam var(--d, .75s) ease-out forwards;
+}
+@keyframes fx-beam { 0% { scale: 0 .4; opacity: 1; } 35% { scale: 1 1; } 70% { scale: 1 1.25; opacity: 1; } 100% { scale: 1 0; opacity: 0; } }
+.fx-slash {
+  position: absolute; width: 260px; height: 6px; margin: -3px 0 0 -130px; z-index: 4; pointer-events: none; border-radius: 99px;
+  background: linear-gradient(90deg, transparent, #fff 40%, var(--bc), transparent); box-shadow: 0 0 18px var(--bc), 0 0 6px #fff;
+  animation: fx-slash .65s cubic-bezier(.2, .9, .3, 1) forwards;
+}
+@keyframes fx-slash { 0% { scale: 0 1; opacity: 1; } 40% { scale: 1 1.3; } 100% { scale: 1.1 .2; opacity: 0; } }
+.fx-flame {
+  position: absolute; width: 170px; margin-left: -85px; translate: 0 -100%; transform-origin: 50% 100%; z-index: 4; pointer-events: none; border-radius: 50% 50% 30% 30%;
+  background: radial-gradient(ellipse 50% 70% at 50% 100%, #fff 0%, #ffe08a 18%, #ff8c2a 45%, #ff3d1a 65%, transparent 75%);
+  filter: blur(3px); mix-blend-mode: screen; animation: fx-flame 1.4s ease-out forwards;
+}
+@keyframes fx-flame { 0% { scale: .3 0; opacity: 0; } 20% { scale: 1 1.1; opacity: 1; } 40% { scale: .9 .95; } 60% { scale: 1.05 1.05; opacity: 1; } 100% { scale: .8 1.3; opacity: 0; } }
+.fx-pow {
+  position: absolute; width: 170px; height: 150px; margin: -75px 0 0 -85px; z-index: 6; pointer-events: none; display: grid; place-items: center;
+  background: #ffd36b; clip-path: polygon(50% 0, 61% 30%, 95% 12%, 74% 42%, 100% 55%, 70% 64%, 82% 100%, 52% 74%, 22% 98%, 30% 66%, 0 60%, 26% 44%, 6% 14%, 38% 30%);
+  animation: fx-pow .95s cubic-bezier(.3, 1.6, .5, 1) forwards;
+}
+.fx-pow b { font: 800 30px var(--display); color: #e5302a; -webkit-text-stroke: 1.5px #1b1530; rotate: -8deg; }
+@keyframes fx-pow { 0% { scale: 0; rotate: -30deg; } 25% { scale: 1.15; rotate: 0deg; } 75% { scale: 1; opacity: 1; } 100% { scale: 1.3; opacity: 0; } }
+.fx-text, .ko-stamp { position: absolute; z-index: 7; pointer-events: none; translate: -50% -50%; white-space: nowrap; }
+.fx-text b {
+  display: block; font: 800 clamp(22px, 4vw, 34px) var(--display); color: #ffd36b; -webkit-text-stroke: 2px #1b1530; text-shadow: 0 4px 0 #1b1530, 0 0 24px #ffb347;
+  animation: fx-text 1.3s cubic-bezier(.2, .9, .3, 1.3) forwards;
+}
+@keyframes fx-text { 0% { scale: 0; } 20% { scale: 1.2; } 30%, 80% { scale: 1; translate: 0 0; opacity: 1; } 100% { translate: 0 -30px; opacity: 0; } }
+.ko-stamp b {
+  display: block; padding: 4px 16px; border: 5px solid #e5302a; border-radius: 12px; rotate: -12deg;
+  font: 800 clamp(34px, 6vw, 54px) var(--display); color: #e5302a; background: #ffffffd8; box-shadow: 0 10px 30px #0008;
+  animation: ko-stamp 1.3s cubic-bezier(.3, 1.5, .5, 1) forwards;
+}
+@keyframes ko-stamp { 0% { scale: 3; opacity: 0; } 18% { scale: 1; opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; scale: .9; } }

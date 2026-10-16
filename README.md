@@ -105,22 +105,24 @@ Les Énergies de base (Pokémon) et terrains de base (Magic) sont illimités, co
 
 ## Favoris
 
-Dans la fenêtre d'une carte (partout sur le site) : **☆ Ajouter aux favoris**. Les favoris ont une étoile sur leur vignette, un filtre « ★ Favoris » dans chaque set de la collection, et leur page **Favoris** (cartes possédées ou encore à chasser). Ils sont synchronisés avec le compte.
+Dans la fenêtre d'une carte (partout sur le site) : **Ajouter aux favoris**. Les favoris ont une étoile sur leur vignette, un filtre « Favoris » dans chaque set de la collection, et leur page **Favoris** (cartes possédées ou encore à chasser). Ils sont synchronisés avec le compte.
 
-## Combat Pokémon contre l'IA
+## Combat Pokémon contre des Dresseurs
 
-Page **Combat** : un deck Pokémon (de ta collection, ou un deck de démo) contre l'IA, en 3 niveaux.
+Page **Combat** : un deck Pokémon (de ta collection, ou un deck de démo) contre un Dresseur, en 3 niveaux.
 Mise en scène inspirée des jeux 3DS (Rubis Oméga / Saphir Alpha) avec les vraies règles du JCC : terrain en 3D (décor selon le type du deck adverse),
 cartes Actives debout sur leurs plateformes, boîtes de PV vert / jaune / rouge, Banc et Récompenses, messages qui s'écrivent,
-menu Attaque / Sac / Pokémon / Fin du tour, caméra, projectiles et impacts selon le type, K.O., musique de combat. Bouton « ⏩ » pour accélérer.
+menu Attaque / Sac / Pokémon / Fin du tour, caméra, projectiles et impacts selon le type, K.O., musique de combat. Bouton « Rapide » pour accélérer.
 - Affichage et enchaînement des animations : [public/js/battle/battle.js](public/js/battle/battle.js) (`perform` → `playback`).
 - Règles : [public/js/battle/engine.js](public/js/battle/engine.js) (Actif / Banc, Énergies, évolutions, Dresseurs, retraite, faiblesse / résistance, états spéciaux, Récompenses).
 - Effets des cartes lus dans le texte français : [public/js/battle/effects.js](public/js/battle/effects.js). Seuls les plus courants sont simulés.
-- IA : [public/js/battle/ai.js](public/js/battle/ai.js). Facile = au hasard, Normal = meilleur coup testé sur une copie de la partie (avec erreurs), Difficile = sans erreur et en anticipant l'attaque adverse.
+- Dresseurs (nom, type, répliques, portrait dessiné en SVG) : [public/js/battle/trainers.js](public/js/battle/trainers.js). Un Dresseur par partie, choisi selon le niveau et le type de son deck.
+- Jeu de l'adversaire : [public/js/battle/adversaire.js](public/js/battle/adversaire.js). Facile = au hasard, Normal = meilleur coup testé sur une copie de la partie (avec erreurs), Difficile = sans erreur et en anticipant l'attaque adverse.
 - Les données de combat (attaques, faiblesses, retraite…) viennent de TCGdex via `npm run fetch -- pokemon`.
 
 ## Effets et sons
 
 - [public/js/fx.js](public/js/fx.js) : fond étoilé animé, particules (explosions, étincelles, confettis), flashs et ondes de choc, inclinaison 3D avec reflet holographique au survol des cartes et des boosters, apparition des éléments au défilement.
-- [public/js/sfx.js](public/js/sfx.js) : tous les sons sont fabriqués par le navigateur (Web Audio), sans fichier audio. Bouton 🔊 / 🔇 dans la barre du haut.
+- [public/js/sfx.js](public/js/sfx.js) : tous les sons sont fabriqués par le navigateur (Web Audio), sans fichier audio. Bouton son / muet dans la barre du haut.
+- [public/js/icons.js](public/js/icons.js) : icônes [Lucide](https://lucide.dev) (licence ISC) copiées en SVG. `icon('star')` dans le code.
 - Ouverture d'un booster : la lumière qui sort du booster prend la couleur de la meilleure carte (bleu, violet, or, arc-en-ciel) ; les cartes rares se chargent avant d'être retournées.

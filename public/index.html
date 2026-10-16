@@ -43,7 +43,7 @@
     </nav>
     <div class="top-right">
       <button class="theme-btn" id="sfx-btn" type="button"></button>
-      <button class="theme-btn" id="theme-btn" type="button"></button>
+      <button class="theme-btn" id="theme-btn" type="button"><svg class="ic t-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8a2.83 2.83 0 0 0 4 4 4 4 0 1 1-4-4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.9 4.9 1.4 1.4"/><path d="m17.7 17.7 1.4 1.4"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.3 17.7-1.4 1.4"/><path d="m19.1 4.9-1.4 1.4"/></svg><svg class="ic t-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg><svg class="ic t-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></button>
       <a class="value-pill" href="#/stats" title="Valeur actuelle de ta collection"><span>Collection</span> <b id="total-value">—</b></a>
       <a class="account-pill" href="#/compte" data-nav="compte" id="account-pill" title="Mon compte">Se connecter</a>
     </div>
@@ -72,12 +72,12 @@
     Aucune carte n'a de valeur réelle ici : c'est le plaisir de l'ouverture, sans dépenser un centime.
   </footer>
   <script>
-    // Bouton jour / nuit : Auto (navigateur) → Clair → Sombre.
+    // Bouton jour / nuit : Auto (navigateur), puis Clair, puis Sombre.
     (function () {
       var btn = document.getElementById('theme-btn');
       var NEXT = { auto: 'light', light: 'dark', dark: 'auto' };
-      var LABEL = { auto: ['◐', 'Thème : comme le navigateur'], light: ['☀', 'Thème : jour'], dark: ['☾', 'Thème : nuit'] };
-      function show() { var p = document.documentElement.dataset.themePref; btn.textContent = LABEL[p][0]; btn.title = LABEL[p][1] + ' (clic pour changer)'; btn.setAttribute('aria-label', btn.title); }
+      var LABEL = { auto: 'Thème : comme le navigateur', light: 'Thème : jour', dark: 'Thème : nuit' };
+      function show() { var p = document.documentElement.dataset.themePref; btn.title = LABEL[p] + ' (clic pour changer)'; btn.setAttribute('aria-label', btn.title); }
       btn.addEventListener('click', function () {
         var p = NEXT[document.documentElement.dataset.themePref] || 'auto';
         try { p === 'auto' ? localStorage.removeItem('theme') : localStorage.setItem('theme', p); } catch (e) {}

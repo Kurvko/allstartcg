@@ -4,6 +4,7 @@ import { GAMES, findSet } from './catalog.js';
 import { loadSet } from './data.js';
 import { getState, getDecks, saveDeck, deleteDeck } from './store.js';
 import { app, esc, fmt } from './ui.js';
+import { icon } from './icons.js';
 
 // ---------- Règles de construction ----------
 
@@ -303,7 +304,7 @@ export async function viewDecks(path = '', helpers = {}) {
     <section class="page" style="--c:${game.color};--a:${game.accent}">
       <h1>Decks</h1>
       <nav class="game-tabs">${DECK_GAMES.map(g => `<a href="#/decks/jeu/${g.id}" class="${g.id === game.id ? 'on' : ''}" style="--c:${g.color}">${esc(g.short ?? g.name)}</a>`).join('')}</nav>
-      <p class="muted rules-line">📜 ${esc(rules.text)}</p>
+      <p class="muted rules-line">${icon('scroll-text')} ${esc(rules.text)}</p>
       <div class="page-head"><h2>Mes decks ${esc(game.name)}</h2><button class="btn primary" data-new>+ Nouveau deck</button></div>
       <div class="deck-list mine"><p class="muted">Chargement…</p></div>
       <h2>Decks conseillés avec ta collection</h2>
@@ -328,7 +329,7 @@ export async function viewDecks(path = '', helpers = {}) {
         <div class="deck-body">
           <h3>${esc(d.name)}</h3>
           <p class="muted">${chk.count.main} cartes · ${fmt(chk.value)}</p>
-          <span class="badge ${chk.ok ? 'ok' : 'ko'}">${chk.ok ? '✓ Prêt à jouer' : `⚠ ${chk.issues.length} point(s) à corriger`}</span>
+          <span class="badge ${chk.ok ? 'ok' : 'ko'}">${chk.ok ? `${icon('check')} Prêt à jouer` : `${icon('triangle-alert')} ${chk.issues.length} point(s) à corriger`}</span>
         </div>
       </a>`;
   }).join('') : '<p class="muted">Aucun deck pour l\'instant.</p>';
@@ -336,7 +337,7 @@ export async function viewDecks(path = '', helpers = {}) {
   const recos = pool.length ? recommend(game.id, pool) : [];
   const recoBox = app.querySelector('.recos');
   if (!recos.length) {
-    recoBox.innerHTML = `<p class="panel">Pas encore assez de cartes ${esc(game.name)} pour proposer un deck. <a class="accent" href="#/game/${game.id}">Ouvre des boosters →</a></p>`;
+    recoBox.innerHTML = `<p class="panel">Pas encore assez de cartes ${esc(game.name)} pour proposer un deck. <a class="accent arrow" href="#/game/${game.id}">Ouvre des boosters</a></p>`;
     return;
   }
   recoBox.innerHTML = recos.map((r, i) => {
@@ -351,7 +352,7 @@ export async function viewDecks(path = '', helpers = {}) {
         <div class="deck-body">
           <h3>${r.colors.map(colorDot).join('')} ${esc(r.name)}</h3>
           <p class="muted">${chk.count.main} cartes · valeur ${fmt(chk.value)}</p>
-          <span class="badge ${r.missing ? 'ko' : 'ok'}">${r.missing ? `Il te manque ${r.missing} carte(s) : continue d'ouvrir des boosters` : '✓ Complet avec ta collection'}</span>
+          <span class="badge ${r.missing ? 'ko' : 'ok'}">${r.missing ? `Il te manque ${r.missing} carte(s) : continue d'ouvrir des boosters` : `${icon('check')} Complet avec ta collection`}</span>
           <button class="btn" data-take="${i}">Créer ce deck</button>
         </div>
       </div>`;
@@ -379,7 +380,7 @@ async function viewDeck(id, { openModal } = {}) {
 
   app.innerHTML = `
     <section class="page deck-editor" style="--c:${game.color};--a:${game.accent}">
-      <a href="#/decks/jeu/${game.id}" class="back">← Decks ${esc(game.name)}</a>
+      <a href="#/decks/jeu/${game.id}" class="back">Decks ${esc(game.name)}</a>
       <div class="page-head">
         <input class="deck-name" value="${esc(deck.name)}" maxlength="60" aria-label="Nom du deck">
         <div class="row-btns">
@@ -387,7 +388,7 @@ async function viewDeck(id, { openModal } = {}) {
           <button class="btn ghost danger" data-delete>Supprimer</button>
         </div>
       </div>
-      <p class="muted rules-line">📜 ${esc(r.text)}</p>
+      <p class="muted rules-line">${icon('scroll-text')} ${esc(r.text)}</p>
       <div class="deck-layout">
         <aside class="deck-side"></aside>
         <div class="deck-pool">
@@ -435,7 +436,7 @@ async function viewDeck(id, { openModal } = {}) {
         <div><span>Valeur</span><b class="accent">${fmt(chk.value)}</b></div>
       </div>
       <div class="deck-check ${chk.ok ? 'ok' : 'ko'}">
-        ${chk.ok ? '✓ Deck valide, prêt à jouer !' : `<b>À corriger :</b><ul>${chk.issues.slice(0, 6).map(i => `<li>${esc(i)}</li>`).join('')}</ul>`}
+        ${chk.ok ? `${icon('check')} Deck valide, prêt à jouer !` : `<b>À corriger :</b><ul>${chk.issues.slice(0, 6).map(i => `<li>${esc(i)}</li>`).join('')}</ul>`}
       </div>
       ${r.leader ? `<h4>${r.leader === 'legend' ? 'Légende' : 'Leader'}</h4>${chk.leader ? line(chk.leader, 1, true) : '<p class="muted small">Aucun : clique sur une carte ' + (r.leader === 'legend' ? 'Légende' : 'Leader') + '.</p>'}` : ''}
       ${[...groups].map(([label, rows]) => `
@@ -451,7 +452,7 @@ async function viewDeck(id, { openModal } = {}) {
       <div class="deck-line ${isLeader ? 'leader' : ''}">
         ${e.card.img ? `<img src="${e.card.img}" alt="" loading="lazy">` : `<span class="basic-img">${colorDot(e.card.play.colors[0])}</span>`}
         <span class="dl-name" title="${esc(e.card.name)}">${e.card.play.cost != null ? `<small class="cost">${e.card.play.cost}</small>` : ''}${esc(e.card.name)}</span>
-        ${isLeader ? '<button data-unleader title="Retirer">✕</button>' : `
+        ${isLeader ? `<button data-unleader title="Retirer">${icon('x')}</button>` : `
         <span class="dl-n">×${n}</span>
         <button data-sub="${e.key}" title="Retirer 1">−</button>
         <button data-add="${e.key}" title="Ajouter 1">+</button>`}
@@ -544,7 +545,7 @@ async function viewDeck(id, { openModal } = {}) {
         const en = entryOf(key, byKey, deck.game);
         if (en) lines.push(`${n} ${en.card.name}${en.card.num ? ` (${en.setKey?.split('/')[1]} ${en.card.num})` : ''}`);
       }
-      navigator.clipboard?.writeText(`${deck.name}\n${lines.join('\n')}`).then(() => { t.textContent = 'Liste copiée ✓'; setTimeout(() => { t.textContent = 'Copier la liste'; }, 1600); });
+      navigator.clipboard?.writeText(`${deck.name}\n${lines.join('\n')}`).then(() => { t.textContent = 'Liste copiée'; setTimeout(() => { t.textContent = 'Copier la liste'; }, 1600); });
     } else if ('delete' in t.dataset) {
       if (confirm(`Supprimer le deck « ${deck.name} » ? Les cartes restent dans ta collection.`)) {
         deleteDeck(deck.id);

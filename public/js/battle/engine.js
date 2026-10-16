@@ -1,5 +1,5 @@
 // Moteur de combat Pokémon (règles de base du JCC). Aucun affichage ici : l'état est un objet simple,
-// les cartes sont référencées par leur numéro (uid) dans `db`, ce qui permet à l'IA de cloner une partie à moindre coût.
+// les cartes sont référencées par leur numéro (uid) dans `db`, ce qui permet à l'adversaire de cloner une partie à moindre coût.
 //
 // Règles gérées : mise en place (7 cartes, Pokémon de base, 6 Récompenses), pioche, Pokémon de base sur le Banc,
 // évolution, 1 Énergie par tour, Dresseurs (Objet, Supporter 1 par tour, Stade, Outil), retraite, attaques,
@@ -13,7 +13,7 @@ const BENCH_MAX = 5;
 
 // ---------- Hasard (graine) ----------
 export function rng(state) {
-  if (state.sim) return Math.random(); // l'IA ne doit pas « voir » les futurs lancers de pièce
+  if (state.sim) return Math.random(); // l'adversaire ne doit pas « voir » les futurs lancers de pièce
   state.seed = (state.seed * 1664525 + 1013904223) % 4294967296;
   return state.seed / 4294967296;
 }
@@ -60,7 +60,7 @@ export function canPay(g, energies, cost) {
   return free >= cost.length;
 }
 export function missingFor(g, energies, cost) {
-  // Nombre d'Énergies manquantes (approximation pour l'IA) et types précis encore requis.
+  // Nombre d'Énergies manquantes (approximation pour l'adversaire) et types précis encore requis.
   const pool = energies.map(uid => energyType(card(g, uid)));
   const types = [];
   for (const t of cost) if (t !== 'Incolore') {
@@ -73,9 +73,9 @@ export function missingFor(g, energies, cost) {
 
 // ---------- Création d'une partie ----------
 /**
- * @param decks  [[cartes du joueur], [cartes de l'IA]] : objets carte (avec play), 60 chacun
+ * @param decks  [[cartes du joueur], [cartes de l'adversaire]] : objets carte (avec play), 60 chacun
  */
-export function newGame(decks, { names = ['Toi', 'IA'], seed = Date.now() % 4294967296 } = {}) {
+export function newGame(decks, { names = ['Toi', 'Adversaire'], seed = Date.now() % 4294967296 } = {}) {
   const g = { db: [], seed, sim: false, turn: 0, current: 0, first: 0, winner: null, reason: '', log: [], pending: null, stadium: null, players: [] };
   for (const [i, list] of decks.entries()) {
     const deck = list.map(c => { g.db.push(c); return g.db.length - 1; });
@@ -134,7 +134,7 @@ function win(g, idx, reason) {
   g.winner = idx;
   g.reason = reason;
   g.pending = null;
-  log(g, `🏆 ${g.players[idx].name} gagne (${reason}).`);
+  log(g, `${g.players[idx].name} gagne (${reason}).`);
 }
 
 export const firstTurn = g => g.turn === 1;
@@ -177,7 +177,7 @@ function knockOut(g, ownerIdx, slot, zone) {
   else owner.bench.splice(owner.bench.indexOf(slot), 1);
   const n = Math.min(prizeValue(c), taker.prizes.length);
   taker.hand.push(...taker.prizes.splice(0, n));
-  log(g, `💥 ${c.name} est K.O. ! ${taker.name} prend ${n} Récompense${n > 1 ? 's' : ''}.`);
+  log(g, `${c.name} est K.O. ! ${taker.name} prend ${n} Récompense${n > 1 ? 's' : ''}.`);
 }
 
 /** Vérifie les KO des deux côtés (l'attaquant en premier : ses Récompenses comptent). */
@@ -239,7 +239,7 @@ export function canRetreat(g, side) {
     && p.active.energies.length >= retreatCost(g, p.active));
 }
 
-/** Toutes les actions possibles du joueur actif (utilisées par l'IA et pour griser l'interface). */
+/** Toutes les actions possibles du joueur actif (utilisées par l'adversaire et pour griser l'interface). */
 export function legalActions(g) {
   if (g.winner != null || g.pending) return [];
   const side = g.current;
@@ -376,7 +376,7 @@ function finishAttack(g) {
   return null;
 }
 
-/** Copie légère d'une partie (pour que l'IA teste des coups). */
+/** Copie légère d'une partie (pour que l'adversaire teste des coups). */
 export function clone(g) {
   const { db, log: _l, ...rest } = g;
   const copy = structuredClone(rest);

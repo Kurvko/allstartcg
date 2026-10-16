@@ -1,5 +1,6 @@
 // Effets sonores fabriqués dans le navigateur (Web Audio) : aucun fichier à télécharger.
-// Bouton 🔊 / 🔇 dans la barre du haut, choix enregistré dans le navigateur.
+// Bouton son / muet dans la barre du haut, choix enregistré dans le navigateur.
+import { icon } from './icons.js';
 
 const KEY = 'allstartcg:sfx';
 let on = (() => { try { return localStorage.getItem(KEY) !== 'off'; } catch { return true; } })();
@@ -218,6 +219,22 @@ export const sfx = {
     const base = { Feu: 62, Eau: 74, Plante: 67, Électrique: 86, Psy: 79, Combat: 55, Obscurité: 58, Métal: 81, Dragon: 64 }[type] ?? 72;
     arp([base + 12, base + 19, base + 24], 0.05, { type: 'sine', d: 0.25, vol: 0.05, rev: 0.5 });
   },
+  /** Un Dresseur repère le joueur : courte fanfare avant le combat. */
+  encounter() {
+    noise({ type: 'bandpass', f: 300, f2: 4000, q: 0.8, a: 0.4, d: 0.1, vol: 0.2 });
+    arp([76, 75, 76, 75, 76, 71, 74, 72, 69], 0.075, { type: 'square', d: 0.09, vol: 0.035, lp: 3200, at: 0.3 });
+    chord([45, 57, 64, 69], { at: 1.0, type: 'sawtooth', lp: 1500, a: 0.01, d: 0.9, vol: 0.04, rev: 0.5 });
+    boom(0.8, 1.0);
+  },
+  /** Attaque surpuissante : plan rapproché sur la carte. */
+  cutin() {
+    noise({ type: 'bandpass', f: 200, f2: 6000, q: 0.7, a: 0.25, d: 0.25, vol: 0.25 });
+    chord([60, 67, 72], { at: 0.2, type: 'sawtooth', lp: 800, lp2: 5000, a: 0.05, d: 0.9, vol: 0.04, rev: 0.6 });
+    tone({ f: 80, f2: 160, type: 'sawtooth', a: 0.4, d: 0.3, vol: 0.06, lp: 900 });
+    sparkle(0.3, 8);
+  },
+  superEff() { arp([79, 84, 88], 0.06, { type: 'square', d: 0.15, vol: 0.035, lp: 4000 }); },
+  zap() { noise({ type: 'highpass', f: 2500, d: 0.12, vol: 0.3 }); tone({ type: 'sawtooth', f: 1200, f2: 90, d: 0.18, vol: 0.06, lp: 5000 }); },
   /** Bruit d'attaque selon le type (avant l'impact). */
   attack(type) {
     switch (type) {
@@ -280,12 +297,12 @@ export const bgm = {
   },
 };
 
-/** Bouton 🔊 / 🔇 de la barre du haut. */
+/** Bouton son / muet de la barre du haut. */
 function soundButton() {
   const btn = document.getElementById('sfx-btn');
   if (!btn) return;
   const show = () => {
-    btn.textContent = on ? '🔊' : '🔇';
+    btn.innerHTML = icon(on ? 'volume-2' : 'volume-x');
     btn.title = on ? 'Son activé (clic pour couper)' : 'Son coupé (clic pour activer)';
     btn.setAttribute('aria-label', btn.title);
     btn.classList.toggle('off', !on);

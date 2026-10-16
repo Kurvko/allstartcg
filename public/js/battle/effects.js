@@ -27,7 +27,7 @@ const refsOf = (g, side, pred = () => true) => {
 };
 const at = (g, ref) => (ref.zone === 'active' ? g.players[ref.side].active : g.players[ref.side].bench[ref.i]);
 const heal = (g, slot, n) => { slot.damage = Math.max(0, slot.damage - n); };
-/** Meilleure carte du deck pour un critère (l'IA comme le joueur prennent la plus forte : PV). */
+/** Meilleure carte du deck pour un critère (l'adversaire comme le joueur prennent la plus forte : PV). */
 function pickFromDeck(g, side, pred) {
   const p = g.players[side];
   const cands = p.deck.filter(uid => pred(card(g, uid)));
