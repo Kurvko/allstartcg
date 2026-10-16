@@ -188,6 +188,15 @@ export function shockwave(x, y, color = '#fff', { size = 220, ms = 700 } = {}) {
   setTimeout(() => d.remove(), ms + 50);
 }
 
+/** Éclat lumineux horizontal (lens flare) à la hauteur d'un point. */
+export function flare(y, color = '#fff', ms = 900) {
+  const d = document.createElement('div');
+  d.className = 'fx-flare';
+  d.style.cssText = `top:${y}px;--fc:${color};--fd:${ms}ms`;
+  document.body.append(d);
+  setTimeout(() => d.remove(), ms + 50);
+}
+
 // ---------- Inclinaison 3D + reflet holographique au survol ----------
 
 const TILT = '.thumb, .set-tile, .binder, .deck-tile, .sc3d-stage';

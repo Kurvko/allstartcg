@@ -354,6 +354,7 @@ main { flex: 1; width: 100%; max-width: 1240px; margin: 0 auto; padding: 0 16px 
   background: var(--panel); border: 1px solid var(--line); animation: pop .25s ease-out;
 }
 .scard-label b { font: 800 18px var(--display); }
+.scard-label[hidden] { display: none; }
 .scard-label em { font-style: normal; color: var(--good); font-weight: 600; font-size: 13px; }
 .scard-label.tier-3 { border-color: #c58bff; } .scard-label.tier-4, .scard-label.tier-5 { border-color: var(--gold); }
 .scard-label.tier-4 b, .scard-label.tier-5 b { color: var(--gold); }
@@ -930,7 +931,8 @@ main, .footer { position: relative; z-index: 1; }
 .value-pill:hover { box-shadow: 0 0 22px -4px #ffd36b88; }
 
 /* ---------- Entrée des pages et apparition au défilement ---------- */
-#app > section { animation: page-in .55s cubic-bezier(.2, .8, .2, 1) both; }
+/* « backwards » : aucune transformation ne reste après l'animation (sinon les éléments fixed seraient pris dans la page). */
+#app > section { animation: page-in .55s cubic-bezier(.2, .8, .2, 1) backwards; }
 @keyframes page-in { from { opacity: 0; translate: 0 18px; } }
 .rv:not(.rv-in) { opacity: 0; }
 .rv-in { animation: rv-in .6s cubic-bezier(.2, .8, .2, 1) var(--rv-d, 0ms) backwards; }
@@ -1073,25 +1075,30 @@ main, .footer { position: relative; z-index: 1; }
 @keyframes pack-in { from { opacity: 0; transform: translateY(-90px) rotateY(-540deg) scale(.4); } 55% { opacity: 1; } }
 .scene.opening.beam-4 .pack3d, .scene.opening.beam-5 .pack3d { animation: pack-wiggle-big .38s ease-in-out; }
 @keyframes pack-wiggle-big { 20% { transform: rotateZ(-4deg) scale(1.04); } 50% { transform: rotateZ(4deg) scale(1.05); } 80% { transform: rotateZ(-3deg) scale(1.04); } }
-.p-light { position: absolute; left: 0; right: 0; top: 13%; height: 0; pointer-events: none; z-index: 3; }
-.p-light::before {
-  content: ''; position: absolute; left: 4%; right: 4%; top: -16px; height: 32px; border-radius: 50%; opacity: 0;
-  background: radial-gradient(closest-side, #fff, var(--beam, #fff) 60%, transparent);
+.p-light { position: absolute; left: 0; right: 0; top: 13%; height: 0; pointer-events: none; transform: translateZ(-2px); }
+.p-light::before { /* lueur dans l'ouverture */
+  content: ''; position: absolute; left: 0; right: 0; top: -40px; height: 80px; opacity: 0;
+  background: radial-gradient(ellipse 50% 50% at 50% 50%, #fff 0%, color-mix(in srgb, var(--beam, #fff) 70%, transparent) 35%, transparent 75%);
 }
+/* Faisceau : dégradé radial dans toutes les directions, sa base est cachée derrière le booster. */
 .p-light i {
-  position: absolute; left: -25%; right: -25%; bottom: 0; height: 640px; transform-origin: 50% 100%; transform: scaleY(0); opacity: 0;
-  background: linear-gradient(to top, #fff, color-mix(in srgb, var(--beam, #fff) 80%, transparent) 18%, color-mix(in srgb, var(--beam, #fff) 30%, transparent) 50%, transparent);
-  mix-blend-mode: screen; filter: blur(3px);
-  -webkit-mask-image: radial-gradient(ellipse 50% 100% at 50% 100%, #000 25%, transparent 100%);
-  mask-image: radial-gradient(ellipse 50% 100% at 50% 100%, #000 25%, transparent 100%);
+  position: absolute; left: -35%; right: -35%; bottom: -30px; height: 720px; transform-origin: 50% 100%; transform: scaleY(0); opacity: 0;
+  background:
+    radial-gradient(ellipse 16% 100% at 50% 100%, #ffffffee 0%, #ffffff55 40%, transparent 80%),
+    radial-gradient(ellipse 42% 100% at 50% 100%, color-mix(in srgb, var(--beam, #fff) 80%, transparent) 0%, color-mix(in srgb, var(--beam, #fff) 30%, transparent) 40%, transparent 75%);
 }
 .scene.beam-5 .p-light i {
-  background: linear-gradient(to top, #fff, transparent 30%), linear-gradient(90deg, #ff6b8b, #ffd36b, #7dffb0, #6bc8ff, #b98bff);
+  background:
+    radial-gradient(ellipse 16% 100% at 50% 100%, #ffffffee 0%, #ffffff55 40%, transparent 80%),
+    linear-gradient(90deg, #ff6b8b, #ffd36b, #7dffb0, #6bc8ff, #b98bff);
+  -webkit-mask-image: radial-gradient(ellipse 42% 100% at 50% 100%, #000 5%, #0008 40%, transparent 75%);
+  mask-image: radial-gradient(ellipse 42% 100% at 50% 100%, #000 5%, #0008 40%, transparent 75%);
 }
 .scene.torn .p-light::before { animation: lip .5s ease-out forwards; }
-.scene.torn .p-light i { animation: beam-up 1s cubic-bezier(.2, .8, .3, 1) forwards; }
+.scene.torn .p-light i { animation: beam-up 1s cubic-bezier(.2, .8, .3, 1) forwards, beam-flicker .18s 1s steps(2) infinite alternate; }
+@keyframes beam-flicker { to { opacity: .65; } }
 @keyframes lip { to { opacity: 1; } }
-@keyframes beam-up { 0% { transform: scaleY(0); opacity: 0; } 25% { opacity: 1; } 100% { transform: scaleY(1); opacity: .8; } }
+@keyframes beam-up { 0% { transform: scaleY(0) scaleX(.4); opacity: 0; } 25% { opacity: 1; } 100% { transform: scaleY(1) scaleX(1); opacity: .85; } }
 
 /* ---------- Paquet de cartes : rayons derrière la carte, carte qui suit la souris ---------- */
 .stack { width: min(250px, 34vh, 60vw); }
@@ -1151,3 +1158,42 @@ main, .footer { position: relative; z-index: 1; }
 :root[data-theme="light"] .scene .rays { opacity: .18; }
 :root[data-theme="light"] .scene.torn .rays { opacity: .5; }
 :root[data-theme="light"] .topbar nav a.on { background: linear-gradient(135deg, #e09a0018, #e0449c18); box-shadow: inset 0 0 0 1px #e09a0040; }
+
+/* ---------- Ouverture : encore plus de spectacle ---------- */
+/* Les cartes jaillissent du booster en éventail, puis retombent en paquet. */
+.scene.emerge .stack { animation: none; transform: translate(-50%, -50%); }
+.scene.emerge:not(.ready) .scard { animation: fan-out .95s cubic-bezier(.2, .75, .25, 1) backwards; animation-delay: calc(var(--i) * 30ms); }
+@keyframes fan-out {
+  0% { transform: translateY(40%) scale(.55); opacity: 0; }
+  12% { opacity: 1; }
+  45% { transform: translate(calc((var(--i) - var(--n) / 2) * 34px), -78%) rotate(calc((var(--i) - var(--n) / 2) * 9deg)) scale(.82); }
+  100% { transform: translate(calc(var(--i) * .7px), calc(var(--i) * 1.4px)); }
+}
+/* Grosse carte : l'écran s'assombrit et la caméra s'approche pendant la charge. */
+.open { position: relative; }
+.open::before {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity .6s;
+  background: radial-gradient(circle at 50% 45%, transparent 18%, #000000d0 70%);
+}
+.open.focus::before { opacity: 1; }
+.open .stage { position: relative; z-index: 1; }
+.scene { transition: scale .9s cubic-bezier(.2, .8, .2, 1); }
+.open.focus .scene { scale: 1.07; }
+/* Carte or / arc-en-ciel : révélée en tournoyant. */
+.scard.flipped.spin .scard-inner { animation: spin-reveal 1.15s cubic-bezier(.15, .75, .2, 1); }
+@keyframes spin-reveal {
+  from { transform: rotateX(0deg) rotateY(-360deg) scale(.9); }
+  55% { transform: rotateX(0deg) rotateY(140deg) scale(1.28); }
+  to { transform: rotateX(0deg) rotateY(180deg) scale(1.1); }
+}
+/* Éclat horizontal (lens flare) */
+.fx-flare {
+  position: fixed; z-index: 79; pointer-events: none; width: 140vw; height: 6px; left: -20vw; margin-top: -3px; border-radius: 50%;
+  background: radial-gradient(ellipse 50% 50% at 50% 50%, #fff, var(--fc) 30%, transparent 70%); mix-blend-mode: screen;
+  animation: fx-flare var(--fd) ease-out forwards;
+}
+.fx-flare::after {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 180px; height: 180px; translate: -50% -50%; border-radius: 50%;
+  background: radial-gradient(circle, #fff 0, var(--fc) 18%, transparent 60%);
+}
+@keyframes fx-flare { 0% { transform: scaleX(.1); opacity: 0; } 15% { opacity: 1; } 100% { transform: scaleX(1); opacity: 0; } }

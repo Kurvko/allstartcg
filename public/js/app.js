@@ -460,7 +460,8 @@ async function viewOpen(setKey) {
     buildStack(cards, fresh);
     scene.classList.add('emerge');              // les cartes sortent, le booster tombe
     sfx.whoosh();
-    await sleep(1100);
+    cards.forEach((_, i) => setTimeout(sfx.deal, 120 + i * 30));
+    await sleep(1300);
     scene.classList.add('ready');
     busy = false;
   };
@@ -528,8 +529,9 @@ async function viewOpen(setKey) {
       el.classList.add('top');
       // Suspense : les grosses cartes s'illuminent et aspirent la lumière avant d'être retournées.
       if (c.tier >= 3) {
-        const ms = c.tier >= 5 ? 1700 : c.tier >= 4 ? 1200 : 700;
+        const ms = c.tier >= 5 ? 1900 : c.tier >= 4 ? 1300 : 700;
         el.classList.add('charging');
+        if (c.tier >= 4) stage.closest('.open')?.classList.add('focus');
         stack.dataset.charge = c.tier;
         const { x, y } = fx.center(el);
         fx.converge(x, y, { colors: c.tier >= 5 ? fx.RAINBOW : ['#fff', TIER_COLOR[c.tier]], ms: ms - 150, rate: c.tier });
@@ -537,10 +539,14 @@ async function viewOpen(setKey) {
         await sleep(ms);
         delete stack.dataset.charge;
       }
+      // Or et arc-en-ciel : la carte tournoie avant de se poser face visible.
+      const spin = c.tier >= 4;
+      if (spin) el.classList.add('spin');
       el.classList.add('flipped');
       sfx.flip();
-      setTimeout(() => el.classList.add('live'), 620);
-      await sleep(230);
+      setTimeout(() => el.classList.add('live'), spin ? 1180 : 620);
+      await sleep(spin ? 560 : 230);
+      stage.closest('.open')?.classList.remove('focus');
       shownTop = Math.max(shownTop, c.tier);
       celebrate(el, c.tier);
       if (c.tier >= 2) stack.dataset.glow = c.tier;
@@ -624,6 +630,7 @@ async function viewOpen(setKey) {
     fx.burst(x, y, { n: tier >= 5 ? 220 : tier >= 4 ? 130 : 60, colors, speed: 6 + tier * 2, shapes: ['spark', 'star', 'dot'], life: 60 + tier * 10 });
     if (tier >= 4) {
       fx.flash(TIER_COLOR[tier], tier >= 5 ? 0.85 : 0.45, tier >= 5 ? 900 : 600);
+      fx.flare(y, TIER_COLOR[tier], tier >= 5 ? 1200 : 900);
       fx.burst(x, y, { n: 60, colors, speed: 14, shapes: ['confetti'], gravity: 0.25, life: 120, size: 5, drag: 0.97 });
     }
     if (tier >= 5) {
