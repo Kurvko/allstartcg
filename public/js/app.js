@@ -141,7 +141,7 @@ async function viewHome() {
 
   app.innerHTML = `
     <section class="hero">
-      <h1>Ouvre des boosters.<br><em>Sans dépenser un centime.</em></h1>
+      <h1>Ouvre des boosters. <em>Sans dépenser un centime.</em></h1>
       <p>${DAILY_PACKS} boosters gratuits par jeu et par jour. Collectionne, complète tes sets, et regarde ta collection prendre de la valeur au prix réel du marché.</p>
       <div class="hero-stats">
         <div><b>${leftToday}</b><span>boosters dispo aujourd'hui</span></div>

@@ -54,6 +54,7 @@ main { flex: 1; width: 100%; max-width: 1240px; margin: 0 auto; padding: 0 16px 
 .topbar nav a { padding: 6px 12px; border-radius: 999px; color: var(--muted); font-weight: 500; }
 .topbar nav a:hover { color: var(--text); }
 .topbar nav a.on { background: #ffffff12; color: var(--text); }
+@media (max-width: 1180px) { .topbar { flex-wrap: wrap; row-gap: 8px; } .topbar nav { order: 3; width: 100%; overflow-x: auto; } }
 .value-pill {
   padding: 6px 14px; border-radius: 999px; white-space: nowrap;
   background: linear-gradient(135deg, #ffd36b22, #ff8bd422); border: 1px solid #ffd36b55;
@@ -85,8 +86,9 @@ main { flex: 1; width: 100%; max-width: 1240px; margin: 0 auto; padding: 0 16px 
 .back:hover { color: var(--text); }
 
 /* ---------- Accueil ---------- */
-.hero { padding: 56px 0 24px; max-width: 760px; }
-.hero h1 { font-size: clamp(34px, 6vw, 64px); }
+.hero { padding: 56px 0 24px; }
+.hero h1 { font-size: clamp(30px, 3.9vw, 50px); }
+@media (min-width: 900px) { .hero h1 { white-space: nowrap; } }
 .hero em { font-style: normal; background: linear-gradient(90deg, #ffd36b, #ff8bd4, #8bb8ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .hero p { color: var(--muted); font-size: 17px; }
 .hero-stats { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
