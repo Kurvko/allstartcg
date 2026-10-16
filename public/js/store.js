@@ -9,6 +9,10 @@ const blank = () => ({
   totalPacks: {},   // { "pokemon/base1": 12 }
   history: {},      // { "2026-10-15": 123.45 } valeur de la collection par jour
   bestPulls: [],    // [{ setKey, id, name, img, price, at }]
+  decks: {},        // { "<id>": { id, game, name, cards: { "pokemon/sv01|sv01-001": 2, "basic:Feu": 10 }, updatedAt } }
+  deletedDecks: {}, // { "<id>": date de suppression } pour la synchro entre appareils
+  resetAt: 0,       // date de la dernière réinitialisation de la collection
+  updatedAt: 0,
 });
 
 let state = load();
@@ -21,8 +25,14 @@ function load() {
   }
 }
 
-function save() {
+const listeners = new Set();
+/** Appelé après chaque sauvegarde (synchronisation du compte). */
+export const onSave = fn => listeners.add(fn);
+
+function save({ silent = false } = {}) {
+  if (!silent) state.updatedAt = Date.now();
   try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* stockage indisponible */ }
+  if (!silent) for (const fn of listeners) fn(state);
 }
 
 export const today = () => {
@@ -68,6 +78,65 @@ export function recordValue(value) {
 
 /** Efface la collection. Le quota du jour est conservé (pas de boosters bonus en réinitialisant). */
 export function resetAll() {
-  state = { ...blank(), opened: state.opened };
+  state = { ...blank(), opened: state.opened, decks: state.decks, deletedDecks: state.deletedDecks, resetAt: Date.now() };
   save();
+}
+
+// ---------- Decks ----------
+
+export const getDecks = gameId => Object.values(state.decks)
+  .filter(d => !gameId || d.game === gameId).sort((a, b) => b.updatedAt - a.updatedAt);
+
+export function saveDeck(deck) {
+  deck.id ??= `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  deck.updatedAt = Date.now();
+  state.decks[deck.id] = deck;
+  save();
+  return deck;
+}
+
+export function deleteDeck(id) {
+  delete state.decks[id];
+  state.deletedDecks[id] = Date.now();
+  save();
+}
+
+// ---------- Synchronisation ----------
+
+const maxInto = (target, src) => { for (const [k, v] of Object.entries(src ?? {})) target[k] = Math.max(target[k] ?? 0, v); };
+
+/**
+ * Fusionne deux sauvegardes (cet appareil + compte en ligne) sans rien perdre :
+ * cartes et boosters ouverts du jour = maximum des deux (le quota ne peut pas être contourné),
+ * decks = version la plus récente, réinitialisation respectée.
+ */
+export function mergeStates(a, b) {
+  a = { ...blank(), ...a }; b = { ...blank(), ...b };
+  const out = blank();
+  out.resetAt = Math.max(a.resetAt, b.resetAt);
+  // Une sauvegarde antérieure à la dernière réinitialisation ne ramène pas l'ancienne collection.
+  const live = [a, b].filter(x => x.updatedAt >= out.resetAt || x.resetAt === out.resetAt);
+  for (const x of live) {
+    for (const [k, cards] of Object.entries(x.collection)) maxInto(out.collection[k] ??= {}, cards);
+    maxInto(out.totalPacks, x.totalPacks);
+    maxInto(out.history, x.history);
+  }
+  for (const x of [a, b]) for (const [day, games] of Object.entries(x.opened)) maxInto(out.opened[day] ??= {}, games);
+  const seen = new Set();
+  out.bestPulls = live.flatMap(x => x.bestPulls)
+    .filter(p => { const k = `${p.setKey}|${p.id}|${p.at}`; return !seen.has(k) && seen.add(k); })
+    .sort((p, q) => q.price - p.price).slice(0, 12);
+  maxInto(out.deletedDecks, a.deletedDecks); maxInto(out.deletedDecks, b.deletedDecks);
+  for (const d of [...Object.values(a.decks), ...Object.values(b.decks)]) {
+    if ((out.deletedDecks[d.id] ?? 0) >= d.updatedAt) continue;
+    if (!out.decks[d.id] || out.decks[d.id].updatedAt < d.updatedAt) out.decks[d.id] = d;
+  }
+  out.updatedAt = Math.max(a.updatedAt, b.updatedAt);
+  return out;
+}
+
+/** Remplace l'état local (après fusion avec le compte). */
+export function replaceState(next) {
+  state = { ...blank(), ...next };
+  save({ silent: true });
 }

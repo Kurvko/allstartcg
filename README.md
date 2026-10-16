@@ -25,6 +25,7 @@ Pour One Piece, ajoute la ligne du set dans [public/js/catalog.js](public/js/cat
 ```
 npm run packs              # télécharge les vrais boosters (images TCGplayer), retire le fond blanc → public/packs/
 npm run packs -- --missing # seulement les sets qui n'ont pas encore de visuel
+npm run packs -- pokemon/me05 onepiece  # seulement ces sets / ce jeu
 ```
 
 ## Dos des cartes
@@ -59,9 +60,27 @@ Sources : TCGdex (Pokémon), Scryfall (Magic), YGOPRODeck (Yu-Gi-Oh!), Lorcast (
 
 TCGCSV couvre tous les jeux vendus sur TCGplayer : pour un nouveau jeu, trouve son `category` et le `group` du set sur https://tcgcsv.com/tcgplayer/categories puis utilise `source: 'tcgcsv'`.
 
+## Comptes en ligne (Supabase)
+
+Sans configuration, la collection reste dans le navigateur. Pour activer les comptes (collection, stats et decks synchronisés sur tous les appareils) :
+
+1. Crée un projet gratuit sur https://supabase.com (région Europe).
+2. **SQL Editor → New query** : colle le contenu de [supabase/schema.sql](supabase/schema.sql) puis **Run**.
+3. **Authentication → URL Configuration** : mets `https://kurvko.github.io/allstartcg/` dans *Site URL* et ajoute aussi `http://localhost:5173/` dans *Redirect URLs*.
+4. **Project Settings → API** : copie *Project URL* et la clé *anon public* dans [public/js/config.js](public/js/config.js).
+
+La clé *anon* est publique par conception : chaque joueur ne peut lire et modifier que sa propre sauvegarde (règles RLS).
+Au moment de la connexion, ce qui est sur l'appareil est fusionné avec le compte. Les boosters du jour prennent le maximum des deux, donc changer d'appareil ne redonne pas de boosters.
+
+## Decks
+
+Page **Decks** : construction avec les cartes de sa collection, vérification des règles de chaque jeu ([public/js/decks.js](public/js/decks.js), `RULES`),
+et decks conseillés générés à partir de ce qu'on possède (lignées d'évolution Pokémon, couleurs du Leader One Piece / Dragon Ball, domaines de la Légende Riftbound, 2 encres Lorcana, 2 couleurs Magic).
+Les Énergies de base (Pokémon) et terrains de base (Magic) sont illimités, comme dans la réalité.
+
 ## Règles
 
 - 10 boosters par jeu et par jour (`DAILY_PACKS`), remis à zéro à minuit.
 - Le tirage est enregistré dès l'ouverture : recharger la page ne relance pas un booster.
 - Réinitialiser la collection ne rend pas les boosters du jour.
-- La collection est enregistrée dans le navigateur (localStorage) : elle est propre à ce navigateur.
+- Sans compte, la collection est enregistrée dans le navigateur (localStorage). Avec un compte, elle est aussi sauvegardée en ligne.

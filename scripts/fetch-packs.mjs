@@ -55,7 +55,7 @@ function findGroup(groups, key, set, enNames) {
   const exact = GROUP_NAME[key];
   if (exact) return groups.find(g => g.name === exact);
   if (set.tcgGroup) return groups.find(g => g.groupId === set.tcgGroup);
-  const wanted = norm(key.startsWith('pokemon/') ? enNames[set.id] ?? set.name : set.name);
+  const wanted = norm(key.startsWith('pokemon/') ? enNames[set.id] ?? set.name : set.apiName ?? set.name);
   return groups.find(g => norm(g.name) === wanted);
 }
 
@@ -69,46 +69,56 @@ function pickPackProducts(products) {
   return (plain.length ? plain : packs).slice(0, MAX_ARTS);
 }
 
-/** Retire le fond blanc uni autour du booster (sans toucher aux visuels pleine page). */
+/**
+ * Retire le fond blanc autour du booster : remplissage depuis les bords sur les pixels quasi blancs
+ * (coins, dents de la soudure, marges). Si le remplissage « fuit » dans le visuel (booster au dessin clair
+ * qui touche le bord, ex. 151), on recommence avec un seuil plus strict, puis on abandonne le détourage.
+ */
 async function cutout(buffer) {
   const { data, info } = await sharp(buffer).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width: w, height: h } = info;
-  const white = i => data[i] > 236 && data[i + 1] > 236 && data[i + 2] > 236;
 
-  let borderWhite = 0, border = 0;
-  for (let x = 0; x < w; x++) for (const y of [0, h - 1]) { border++; borderWhite += white((y * w + x) * 4); }
-  for (let y = 0; y < h; y++) for (const x of [0, w - 1]) { border++; borderWhite += white((y * w + x) * 4); }
-
-  // Vrai fond blanc : le bord est blanc presque partout (≈ 100 %). Un visuel pleine page au fond clair
-  // (ex. 151, ≈ 66 %) n'est pas détouré, sinon le remplissage mangerait le dessin.
-  if (borderWhite / border > 0.9) {
+  for (const min of [238, 248]) {
+    const white = p => {
+      const r = data[p * 4], g = data[p * 4 + 1], b = data[p * 4 + 2];
+      return r > min && g > min && b > min && Math.max(r, g, b) - Math.min(r, g, b) < 14;
+    };
     const removed = new Uint8Array(w * h);
     const stack = [];
-    const push = (x, y) => {
-      if (x < 0 || y < 0 || x >= w || y >= h) return;
-      const p = y * w + x;
-      if (removed[p] || !white(p * 4)) return;
-      removed[p] = 1;
-      stack.push(p);
-    };
-    for (let x = 0; x < w; x++) { push(x, 0); push(x, h - 1); }
-    for (let y = 0; y < h; y++) { push(0, y); push(w - 1, y); }
-    let count = 0;
+    const push = p => { if (!removed[p] && white(p)) { removed[p] = 1; stack.push(p); } };
+    for (let x = 0; x < w; x++) { push(x); push((h - 1) * w + x); }
+    for (let y = 0; y < h; y++) { push(y * w); push(y * w + w - 1); }
     while (stack.length) {
       const p = stack.pop();
-      count++;
+      const x = p % w;
+      if (x > 0) push(p - 1);
+      if (x < w - 1) push(p + 1);
+      if (p >= w) push(p - w);
+      if (p < w * (h - 1)) push(p + w);
+    }
+
+    // Boîte du booster (pixels gardés) puis contrôle de fuite au centre de cette boîte.
+    let x0 = w, x1 = 0, y0 = h, y1 = 0;
+    for (let p = 0; p < w * h; p++) if (!removed[p]) {
       const x = p % w, y = (p / w) | 0;
-      push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1);
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
     }
-    if (count / (w * h) < 0.6) {
-      for (let p = 0; p < w * h; p++) {
-        if (removed[p]) { data[p * 4 + 3] = 0; continue; }
-        // Bord adouci : pixel clair voisin du fond -> semi-transparent.
-        const x = p % w, y = (p / w) | 0;
-        const near = (x > 0 && removed[p - 1]) || (x < w - 1 && removed[p + 1]) || (y > 0 && removed[p - w]) || (y < h - 1 && removed[p + w]);
-        if (near && data[p * 4] > 200 && data[p * 4 + 1] > 200 && data[p * 4 + 2] > 200) data[p * 4 + 3] = 110;
-      }
+    if (x1 <= x0 || y1 <= y0) continue;
+    const bw = x1 - x0, bh = y1 - y0;
+    let leak = 0, inner = 0;
+    for (let y = y0 + bh * 0.12 | 0; y < y1 - bh * 0.12; y++) for (let x = x0 + bw * 0.12 | 0; x < x1 - bw * 0.12; x++) {
+      inner++; leak += removed[y * w + x];
     }
+    if (leak / inner > 0.003) continue;
+
+    for (let p = 0; p < w * h; p++) {
+      if (removed[p]) { data[p * 4 + 3] = 0; continue; }
+      // Bord adouci : pixel clair voisin du fond -> semi-transparent.
+      const x = p % w;
+      const near = (x > 0 && removed[p - 1]) || (x < w - 1 && removed[p + 1]) || (p >= w && removed[p - w]) || (p < w * (h - 1) && removed[p + w]);
+      if (near && data[p * 4] > 200 && data[p * 4 + 1] > 200 && data[p * 4 + 2] > 200) data[p * 4 + 3] = 110;
+    }
+    break;
   }
   return sharp(data, { raw: { width: w, height: h, channels: 4 } })
     .trim({ threshold: 5 })
@@ -120,6 +130,7 @@ async function cutout(buffer) {
 // ---------- Main ----------
 
 const missingOnly = process.argv.includes('--missing');
+const only = process.argv.slice(2).filter(a => !a.startsWith('--')); // ex. pokemon/me05 onepiece
 let mapping = {};
 try { mapping = JSON.parse(await readFile(OUT_JSON, 'utf8')); } catch { /* premier lancement */ }
 
@@ -129,6 +140,7 @@ const misses = [];
 
 for (const { game, set, key } of allSets()) {
   if (missingOnly && mapping[key]?.length) continue;
+  if (only.length && !only.some(o => key === o || key.startsWith(o + '/'))) continue;
   const cat = set.category ?? CATEGORY[game.id];
   groupsByCat[cat] ??= (await getJson(`https://tcgcsv.com/tcgplayer/${cat}/groups`)).results;
   const group = findGroup(groupsByCat[cat], key, set, enNames);

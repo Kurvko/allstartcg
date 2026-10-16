@@ -1,16 +1,17 @@
 import { GAMES, DAILY_PACKS, findSet } from './catalog.js';
 import { loadPacks, loadSet, openPack, collectionSummary } from './data.js';
 import { getState, packsLeft, owned, recordPack, recordValue, resetAll } from './store.js';
+import { app, esc, fmt } from './ui.js';
+import { initCloud } from './cloud.js';
+import { viewAccount, accountBadge } from './account.js';
+import { viewDecks } from './decks.js';
+import { viewPokedex, viewSets, viewCards } from './library.js';
 
-const app = document.getElementById('app');
 const PACKS = await loadPacks(); // { "pokemon/base1": ["packs/pokemon/base1-0.webp", …] }
 const modal = document.getElementById('modal');
 
 // ---------- Utilitaires ----------
 
-const euro = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
-const fmt = v => (v == null ? '—' : euro.format(v));
-const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
 const RARITY_LABEL = r => r.replace(/_/g, ' ');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -176,6 +177,7 @@ function setTile(game, set, row) {
   return `
     <a class="set-tile" href="#/open/${row.key}" data-name="${esc(set.name.toLowerCase())}">
       ${packHtml(game, set, row.meta.chase.img, { img: PACKS[row.key]?.[0] })}
+      <h3 class="set-name">${esc(set.name)}</h3>
       <div class="progress"><i style="width:${pct}%"></i></div>
       <div class="set-tile-info"><span>${row.unique}/${row.total} cartes</span><b>${fmt(row.value)}</b></div>
     </a>`;
@@ -640,7 +642,10 @@ function viewNotFound() {
 
 // ---------- Routeur ----------
 
+let routeSeq = 0, routeDone = 0;
+
 async function route() {
+  const seq = ++routeSeq;
   modal.hidden = true;
   const path = location.hash.replace(/^#\/?/, '');
   const [page, ...rest] = path.split('/');
@@ -653,10 +658,18 @@ async function route() {
     else if (page === 'open') await viewOpen(setKey);
     else if (page === 'collection') await (setKey ? viewCollectionSet(setKey) : viewCollection());
     else if (page === 'stats') await viewStats();
+    else if (page === 'decks') await viewDecks(setKey, { openModal });
+    else if (page === 'compte') await viewAccount();
+    else if (page === 'pokedex') await viewPokedex(setKey, { openModal });
+    else if (page === 'sets') await viewSets(setKey);
+    else if (page === 'cartes') await viewCards(setKey, { openModal });
     else viewNotFound();
   } catch (err) {
     app.innerHTML = `<section class="page"><h1>Oups</h1><p>${esc(err.message)}</p></section>`;
   }
+  // Une page lente (ex. accueil) a fini après un changement de page : on réaffiche la page demandée.
+  if (seq < routeSeq) { if (routeDone === routeSeq) route(); return; }
+  routeDone = seq;
   window.scrollTo(0, 0);
 }
 
@@ -680,3 +693,7 @@ setInterval(() => document.querySelectorAll('.countdown').forEach(el => { el.tex
 
 route();
 refreshTotal();
+accountBadge();
+// Sauvegarde du compte récupérée : on réaffiche la page avec la collection à jour.
+window.addEventListener('allstar:synced', () => { refreshTotal(); if (!app.querySelector('.stage, form')) route(); });
+initCloud();

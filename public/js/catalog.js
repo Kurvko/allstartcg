@@ -93,7 +93,7 @@ const PK_PRICE_OVERRIDE = { base1: 300 };
 function pokemonSet(s) {
   const era = PK_ERAS[s.serie] ?? PK_ERAS.sv;
   return {
-    id: s.id, name: s.name, year: +s.date.slice(0, 4), group: s.serieName, source: 'tcgdex', lang: 'fr', serie: s.serie,
+    id: s.id, name: s.name, year: +s.date.slice(0, 4), date: s.date, group: s.serieName, source: 'tcgdex', lang: 'fr', serie: s.serie,
     packPrice: PK_PRICE_OVERRIDE[s.id] ?? era.price, tiers: PK_TIERS, slots: PK_SET_SLOTS[s.id] ?? era.slots,
   };
 }
@@ -165,7 +165,7 @@ export const GAMES = [
     accent: '#6b3d1d',
     sets: [
       {
-        id: 'lea', packPrice: 20000, name: 'Alpha', year: 1993, source: 'scryfall',
+        id: 'lea', packPrice: 20000, name: 'Alpha (Édition limitée)', apiName: 'Alpha', year: 1993, source: 'scryfall',
         tiers: { common: 0, uncommon: 1, rare: 4 },
         slots: [...C(11, 'common'), ...C(3, 'uncommon'), [['rare', 1]]],
       },
@@ -189,12 +189,12 @@ export const GAMES = [
     accent: '#3b2470',
     sets: [
       {
-        id: 'LOB', packPrice: 150, name: 'Legend of Blue Eyes White Dragon', year: 2002, source: 'ygoprodeck',
+        id: 'LOB', packPrice: 150, name: 'La Légende du Dragon Blanc aux Yeux Bleus', apiName: 'Legend of Blue Eyes White Dragon', year: 2002, source: 'ygoprodeck',
         tiers: YGO_TIERS,
         slots: YGO_SLOTS,
       },
       {
-        id: 'MRD', packPrice: 120, name: 'Metal Raiders', year: 2002, source: 'ygoprodeck',
+        id: 'MRD', packPrice: 120, name: 'Métal Raiders', apiName: 'Metal Raiders', year: 2002, source: 'ygoprodeck',
         tiers: YGO_TIERS,
         slots: YGO_SLOTS,
       },
@@ -207,7 +207,7 @@ export const GAMES = [
     accent: '#1d2a5a',
     sets: [
       {
-        id: '1', packPrice: 12, name: 'The First Chapter', year: 2023, source: 'lorcast',
+        id: '1', packPrice: 12, name: 'Premier Chapitre', apiName: 'The First Chapter', year: 2023, source: 'lorcast',
         tiers: { Common: 0, Uncommon: 1, Rare: 2, Super_rare: 3, Legendary: 4, Enchanted: 5 },
         // 6 communes, 3 peu communes, 2 rares ou mieux (Super Rare ≈ 1/3,4, Légendaire ≈ 1/8 par booster), 1 foil (Enchanted ≈ 1/96).
         slots: [
@@ -262,17 +262,17 @@ export const GAMES = [
     accent: '#1c3f8f',
     sets: [
       {
-        id: 'FB01', packPrice: 8, name: 'Fusion World – Awakened Pulse', year: 2024, source: 'tcgcsv', category: 80, tcgGroup: 23401, variants: DBFW_VARIANTS,
+        id: 'FB01', packPrice: 8, name: 'Fusion World – Awakened Pulse (VO)', year: 2024, source: 'tcgcsv', category: 80, tcgGroup: 23401, variants: DBFW_VARIANTS,
         tiers: DBFW_TIERS,
         slots: DBFW_SLOTS,
       },
       {
-        id: 'FB10', packPrice: 9, name: 'Fusion World – Cross Force', year: 2026, source: 'tcgcsv', category: 80, tcgGroup: 24604, variants: DBFW_VARIANTS,
+        id: 'FB10', packPrice: 9, name: 'Fusion World – Cross Force (VO)', year: 2026, source: 'tcgcsv', category: 80, tcgGroup: 24604, variants: DBFW_VARIANTS,
         tiers: DBFW_TIERS,
         slots: DBFW_SLOTS,
       },
       {
-        id: 'B01', packPrice: 15, name: 'Masters – Galactic Battle', year: 2017, source: 'tcgcsv', category: 27, tcgGroup: 1962,
+        id: 'B01', packPrice: 15, name: 'Masters – Galactic Battle (VO)', year: 2017, source: 'tcgcsv', category: 27, tcgGroup: 1962,
         tiers: { Common: 0, Uncommon: 1, Rare: 2, 'Super Rare': 3, 'Special Rare': 5 },
         // 12 cartes : 8 communes, 3 peu communes, 1 Rare ou mieux (par boîte ≈ 12 R, 8 SR, 4 SPR).
         slots: [...C(8, 'Common'), ...C(3, 'Uncommon'), [['Rare', 50], ['Super Rare', 33.3], ['Special Rare', 16.7]]],
@@ -286,8 +286,8 @@ export const GAMES = [
     color: '#3fd0e0',
     accent: '#2a1650',
     sets: [
-      { id: 'OGN', packPrice: 12, name: 'Origins', year: 2025, source: 'tcgcsv', category: 89, tcgGroup: 24344, tiers: RIFT_TIERS, slots: RIFT_SLOTS, variants: RIFT_VARIANTS },
-      { id: 'SFD', packPrice: 9, name: 'Spiritforged', year: 2026, source: 'tcgcsv', category: 89, tcgGroup: 24519, tiers: RIFT_TIERS, slots: RIFT_SLOTS, variants: RIFT_VARIANTS },
+      { id: 'OGN', packPrice: 12, name: 'Origines', year: 2025, source: 'tcgcsv', category: 89, tcgGroup: 24344, tiers: RIFT_TIERS, slots: RIFT_SLOTS, variants: RIFT_VARIANTS },
+      { id: 'SFD', packPrice: 9, name: 'Armes spirituelles', year: 2026, source: 'tcgcsv', category: 89, tcgGroup: 24519, tiers: RIFT_TIERS, slots: RIFT_SLOTS, variants: RIFT_VARIANTS },
       { id: 'VEN', packPrice: 7, name: 'Vendetta', year: 2026, source: 'tcgcsv', category: 89, tcgGroup: 24698, tiers: RIFT_TIERS, slots: RIFT_SLOTS, variants: RIFT_VARIANTS },
     ],
   },

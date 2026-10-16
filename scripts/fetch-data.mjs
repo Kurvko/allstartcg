@@ -12,6 +12,11 @@ const HEADERS = { 'User-Agent': 'AllStarTCG/0.1 (projet perso)', Accept: 'applic
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const usd = v => (v == null || v === '' || Number(v) <= 0 ? null : +(Number(v) * USD_TO_EUR).toFixed(2));
 const eur = v => (v == null || v === '' || Number(v) <= 0 ? null : +Number(v).toFixed(2));
+const num = v => (v == null || v === '' || Number.isNaN(parseInt(v, 10)) ? undefined : parseInt(v, 10));
+const list = v => (v ? String(v).split(/[;/]/).map(x => x.trim()).filter(x => x && !/^(none|colorless|n\/a)$/i.test(x)) : []);
+
+// Infos de jeu utilisées par les decks : kind (type de carte), colors, cost, power, + stage / basic / extra.
+const play = o => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && v !== false && !(Array.isArray(v) && !v.length)));
 
 async function getJson(url, options = {}, tries = 4) {
   for (let i = 1; ; i++) {
@@ -64,6 +69,11 @@ async function fromTcgdex(set) {
       img: `${image}/low.webp`,
       imgHi: `${image}/high.webp`,
       price: usd(tpKey && tp[tpKey].marketPrice) ?? eur(cm?.trend) ?? eur(cm?.avg),
+      play: play({
+        kind: c.category === 'Pokémon' ? 'pokemon' : c.category === 'Énergie' ? 'energy' : 'trainer',
+        colors: c.types, power: num(c.hp), stage: c.stage, from: c.evolveFrom, dex: c.dexId, sub: c.trainerType,
+        basic: c.category === 'Énergie' && c.energyType === 'Normal',
+      }),
     };
   });
 }
@@ -88,15 +98,19 @@ async function fromScryfall(set) {
       img: imgs.normal,
       imgHi: imgs.large,
       price: eur(c.prices.eur) ?? usd(c.prices.usd) ?? eur(c.prices.eur_foil) ?? usd(c.prices.usd_foil),
+      play: play({
+        kind: /Land/.test(c.type_line) ? 'land' : /Creature/.test(c.type_line) ? 'creature' : 'spell',
+        colors: c.color_identity, cost: c.cmc, power: num(c.power), basic: /Basic Land/.test(c.type_line),
+      }),
     };
   }).filter(Boolean);
 }
 
 async function fromYgoprodeck(set) {
-  const { data } = await getJson(`https://db.ygoprodeck.com/api/v7/cardinfo.php?cardset=${encodeURIComponent(set.name)}`);
+  const { data } = await getJson(`https://db.ygoprodeck.com/api/v7/cardinfo.php?cardset=${encodeURIComponent(set.apiName ?? set.name)}`);
   const naCode = new RegExp(`^${set.id}-(EN)?\\d`);
   return data.map(c => {
-    const entries = c.card_sets.filter(s => s.set_name === set.name);
+    const entries = c.card_sets.filter(s => s.set_name === (set.apiName ?? set.name));
     const entry = entries.find(s => naCode.test(s.set_code)) ?? entries[0];
     if (!entry) return null;
     return {
@@ -107,6 +121,11 @@ async function fromYgoprodeck(set) {
       img: c.card_images[0].image_url_small,
       imgHi: c.card_images[0].image_url,
       price: usd(entry.set_price) ?? usd(c.card_prices?.[0]?.tcgplayer_price),
+      play: play({
+        kind: c.frameType === 'spell' ? 'spell' : c.frameType === 'trap' ? 'trap' : 'monster',
+        colors: c.attribute ? [c.attribute] : [], cost: c.level, power: c.atk,
+        extra: /fusion|synchro|xyz|link/.test(c.frameType),
+      }),
     };
   }).filter(Boolean).sort((a, b) => a.num.localeCompare(b.num));
 }
@@ -121,6 +140,7 @@ async function fromLorcast(set) {
     img: c.image_uris.digital.normal,
     imgHi: c.image_uris.digital.large,
     price: usd(c.prices?.usd) ?? usd(c.prices?.usd_foil),
+    play: play({ kind: (c.type?.[0] ?? 'character').toLowerCase(), colors: c.ink ? [c.ink] : [], cost: c.cost, power: c.strength }),
   }));
 }
 
@@ -139,6 +159,7 @@ async function fromOptcg(set) {
     img: c.card_image,
     imgHi: c.card_image,
     price: usd(c.market_price) ?? usd(c.inventory_price),
+    play: play({ kind: (c.card_type ?? 'character').toLowerCase(), colors: list(c.card_color?.replace(/ /g, ';')), cost: num(c.card_cost), power: num(c.card_power) }),
   })).sort((a, b) => a.id.localeCompare(b.id));
 }
 
@@ -162,8 +183,23 @@ async function fromTcgcsv(set) {
       img: p.imageUrl.replace('_200w', '_400w'),
       imgHi: p.imageUrl.replace('_200w', '_in_1000x1000'),
       price: usd(priceOf[p.productId]),
+      play: tcgcsvPlay(p, field),
     };
   }).sort((a, b) => a.num.localeCompare(b.num, 'en', { numeric: true }));
+}
+
+// Champs TCGplayer -> infos de jeu (One Piece, Dragon Ball, Riftbound).
+function tcgcsvPlay(p, field) {
+  const type = (field(p, 'CardType') ?? field(p, 'Card Type') ?? '').toLowerCase();
+  const kind = /legend/.test(type) ? 'legend' : /champion/.test(type) ? 'champion' : /battlefield/.test(type) ? 'battlefield'
+    : /rune/.test(type) ? 'rune' : /unit/.test(type) ? 'unit' : /spell/.test(type) ? 'spell' : /gear/.test(type) ? 'gear'
+    : type || undefined;
+  return play({
+    kind,
+    colors: list(field(p, 'Color') ?? field(p, 'Domain')),
+    cost: num(field(p, 'Cost') ?? field(p, 'Energy Cost') ?? field(p, 'EnergyColor Cost')),
+    power: num(field(p, 'Power') ?? field(p, 'Might')),
+  });
 }
 
 const SOURCES = { tcgdex: fromTcgdex, scryfall: fromScryfall, ygoprodeck: fromYgoprodeck, lorcast: fromLorcast, optcg: fromOptcg, tcgcsv: fromTcgcsv };
