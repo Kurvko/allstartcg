@@ -6,7 +6,22 @@
   <meta name="build" content="">
   <title>AllStar TCG</title>
   <meta name="description" content="Ouvre gratuitement des boosters de tous les TCG, collectionne et regarde ta collection prendre de la valeur.">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✦</text></svg>">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <script>
+    // Thème : choix enregistré (clair / sombre), sinon celui du navigateur.
+    (function () {
+      var pref; try { pref = localStorage.getItem('theme'); } catch (e) {}
+      var dark = window.matchMedia && matchMedia('(prefers-color-scheme: dark)');
+      window.applyTheme = function (p) {
+        pref = p;
+        var t = p === 'light' || p === 'dark' ? p : (dark && !dark.matches ? 'light' : 'dark');
+        document.documentElement.dataset.theme = t;
+        document.documentElement.dataset.themePref = p || 'auto';
+      };
+      applyTheme(pref);
+      if (dark && dark.addEventListener) dark.addEventListener('change', function () { if (!pref || pref === 'auto') applyTheme(pref); });
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -14,7 +29,7 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="#/"><span class="brand-mark">✦</span> AllStar <b>TCG</b></a>
+    <a class="brand" href="#/" aria-label="AllStar TCG — accueil"><img src="logo.webp" alt="AllStar TCG" width="186" height="40"></a>
     <nav>
       <a href="#/" data-nav="home">Boosters</a>
       <a href="#/collection" data-nav="collection">Collection</a>
@@ -26,6 +41,7 @@
       <a href="#/stats" data-nav="stats">Stats</a>
     </nav>
     <div class="top-right">
+      <button class="theme-btn" id="theme-btn" type="button"></button>
       <a class="value-pill" href="#/stats" title="Valeur actuelle de ta collection"><span>Collection</span> <b id="total-value">—</b></a>
       <a class="account-pill" href="#/compte" data-nav="compte" id="account-pill" title="Mon compte">Se connecter</a>
     </div>
@@ -53,6 +69,21 @@
     Projet perso non officiel — images et prix fournis par TCGdex, Scryfall, YGOPRODeck, Lorcast et TCGCSV ; logos One Piece : opecards.fr ; cartes sport dessinées par le site avec les effectifs ESPN et les photos de footballeurs de Wikimedia Commons (licences libres, auteurs indiqués sur Commons).
     Aucune carte n'a de valeur réelle ici : c'est le plaisir de l'ouverture, sans dépenser un centime.
   </footer>
+  <script>
+    // Bouton jour / nuit : Auto (navigateur) → Clair → Sombre.
+    (function () {
+      var btn = document.getElementById('theme-btn');
+      var NEXT = { auto: 'light', light: 'dark', dark: 'auto' };
+      var LABEL = { auto: ['◐', 'Thème : comme le navigateur'], light: ['☀', 'Thème : jour'], dark: ['☾', 'Thème : nuit'] };
+      function show() { var p = document.documentElement.dataset.themePref; btn.textContent = LABEL[p][0]; btn.title = LABEL[p][1] + ' (clic pour changer)'; btn.setAttribute('aria-label', btn.title); }
+      btn.addEventListener('click', function () {
+        var p = NEXT[document.documentElement.dataset.themePref] || 'auto';
+        try { p === 'auto' ? localStorage.removeItem('theme') : localStorage.setItem('theme', p); } catch (e) {}
+        applyTheme(p === 'auto' ? null : p); show();
+      });
+      show();
+    })();
+  </script>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>
