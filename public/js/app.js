@@ -7,7 +7,7 @@ import { viewAccount, accountBadge } from './account.js';
 import { viewDecks } from './decks.js';
 import { viewPokedex, viewSets, viewCards } from './library.js';
 import { viewBattle } from './battle/battle.js';
-import { sfx } from './sfx.js';
+import { sfx, bgm } from './sfx.js';
 import * as fx from './fx.js';
 
 const { TIER_COLOR } = fx;
@@ -859,6 +859,7 @@ let routeSeq = 0, routeDone = 0;
 async function route() {
   const seq = ++routeSeq;
   modal.hidden = true;
+  bgm.stop(); // la musique de combat s'arrête dès qu'on change de page
   const path = location.hash.replace(/^#\/?/, '');
   const [page, ...rest] = path.split('/');
   const setKey = rest.join('/');

@@ -1,14 +1,15 @@
-// Page Combat : un deck Pokémon contre l'IA (3 niveaux).
+// Page Combat : un deck Pokémon contre l'IA (3 niveaux), mis en scène comme un combat des jeux Pokémon 3DS
+// (Rubis Oméga / Saphir Alpha). Les règles restent celles du JCC (engine.js) : ce fichier ne gère que l'affichage.
 import { loadSet } from '../data.js';
 import { getDecks, getState, recordBattle } from '../store.js';
 import { app, esc } from '../ui.js';
 import {
   apply, attackable, canRetreat, card, hpLeft, isBasic, legalActions, maxHp, newGame, promote, retreatCost,
-  setup, STATUS_FR, topCard, energyType,
+  setup, slotAt, STATUS_FR, topCard, energyType,
 } from './engine.js';
 import { chooseAction, chooseSetup, bestPromotion, LEVELS } from './ai.js';
 import { buildDeck, basicEnergy, mainTypes } from './build.js';
-import { sfx } from '../sfx.js';
+import { sfx, bgm } from '../sfx.js';
 import * as fx from '../fx.js';
 
 const TYPE_HEX = {
@@ -100,156 +101,256 @@ export async function viewBattle() {
     const aiCfg = AI_POOLS[choice.level];
     const aiPool = await poolOf(aiCfg.sets);
     const types = mainTypes(aiPool).slice(0, 4);
-    const aiDeck = buildDeck(aiPool, types[Math.floor(Math.random() * types.length)], { strength: aiCfg.strength });
-    startBattle(mine, aiDeck, choice.level);
+    const aiType = types[Math.floor(Math.random() * types.length)];
+    const aiDeck = buildDeck(aiPool, aiType, { strength: aiCfg.strength });
+    startBattle(mine, aiDeck, choice.level, aiType);
   });
 }
 
-// ---------- Plateau ----------
-function startBattle(myDeck, aiDeck, level) {
+// ---------- Plateau façon Rubis Oméga / Saphir Alpha ----------
+// Le terrain (écran du haut) : les deux cartes Actives debout sur leurs plateformes, les boîtes de PV, le Banc,
+// la boîte de messages. La console (écran du bas) : Attaque / Sac / Pokémon / Fin du tour.
+// Chaque action passe par perform() : l'état change d'un coup dans le moteur, puis playback() rejoue
+// les messages du journal et les animations (caméra, projectile, impact, PV qui descendent, K.O.).
+
+const TERRAIN = { Plante: 'forest', Eau: 'beach', Feu: 'volcano', Psy: 'night', Obscurité: 'night', Combat: 'cave', Métal: 'cave', Dragon: 'sky', Électrique: 'sky' };
+const STATUS_SHORT = { poison: 'PSN', burn: 'BRU', sleep: 'SOM', paralysis: 'PAR', confusion: 'CNF' };
+const TYPE_FX = {
+  Feu: { colors: ['#ff4d1a', '#ffb347', '#ffe08a'], shapes: ['spark', 'dot'] },
+  Eau: { colors: ['#3e8bff', '#8fd3ff', '#ffffff'], shapes: ['dot'] },
+  Plante: { colors: ['#30a46c', '#9be15d', '#e6ffb3'], shapes: ['confetti', 'star'] },
+  Électrique: { colors: ['#fff35c', '#ffffff', '#ffd000'], shapes: ['spark'] },
+  Psy: { colors: ['#ff6bd6', '#c58bff', '#ffffff'], shapes: ['star', 'dot'] },
+  Combat: { colors: ['#ff9f43', '#c2703d', '#ffffff'], shapes: ['star', 'spark'] },
+  Obscurité: { colors: ['#8a6bd1', '#3a2a5c', '#c9b3ff'], shapes: ['dot'] },
+  Métal: { colors: ['#e4e9f2', '#95a5a6', '#ffffff'], shapes: ['spark'] },
+  Dragon: { colors: ['#ffd36b', '#c8a03b', '#ff6b3d'], shapes: ['star', 'spark'] },
+  Fée: { colors: ['#ffb3d9', '#ffffff', '#ff8bd4'], shapes: ['star'] },
+  Incolore: { colors: ['#ffffff', '#e8e8e8', '#ffd36b'], shapes: ['star', 'dot'] },
+};
+const FAST_KEY = 'allstartcg:battle-fast';
+
+const alive = ui => ui.root?.isConnected;
+const keyOf = (side, s) => `${side}|${s.stack[0]}`;
+const hpClass = pct => (pct > 0.5 ? 'hp-ok' : pct > 0.2 ? 'hp-mid' : 'hp-low');
+const typeOf = c => c?.play?.colors?.[0] ?? 'Incolore';
+const wait = (ui, ms) => sleep(ui.fast ? ms / 2 : ms);
+
+function startBattle(myDeck, aiDeck, level, aiType) {
   const g = newGame([myDeck, aiDeck], { names: ['Toi', `IA ${LEVELS[level].label}`] });
-  const ui = { g, level, sel: null, mode: null, setupPick: [], busy: false, done: false, logShown: 0 };
-  app.innerHTML = '<section class="page battle"><div class="board"></div></section>';
+  let fast = false;
+  try { fast = localStorage.getItem(FAST_KEY) === '1'; } catch { /* stockage indisponible */ }
+  const ui = { g, level, view: 'main', sel: null, selActions: null, mode: null, setupPick: [], busy: true, done: false, fast, shown: null, preview: null, skip: false };
+  app.innerHTML = `
+    <section class="page battle rosa">
+      <div class="bwrap">
+        <div class="arena t-${TERRAIN[aiType] ?? 'plain'} intro">
+          <div class="sky"><i class="cloud c1"></i><i class="cloud c2"></i><i class="cloud c3"></i></div>
+          <div class="far"></div>
+          <div class="world">
+            <div class="ground"></div>
+            <div class="pad foe"></div>
+            <div class="pad me"></div>
+            <div class="fighters"></div>
+          </div>
+          <div class="hud"></div>
+          <div class="overlay"></div>
+          <div class="msgbox" title="Clique pour passer"><p></p><i>▼</i></div>
+        </div>
+        <div class="console"></div>
+      </div>
+      <aside class="bpreview"><p>Survole une carte pour la voir en grand.</p></aside>
+    </section>`;
+  ui.root = app.querySelector('.battle');
+  ui.arena = ui.root.querySelector('.arena');
+  bind(ui);
+  bgm.start();
+  sfx.whoosh(0.25);
+  intro(ui);
+}
+
+async function intro(ui) {
+  renderConsole(ui);
+  await sleep(900);
+  ui.arena.classList.remove('intro');
+  await say(ui, `${ui.g.players[1].name} veut se battre !`);
+  for (const line of ui.g.log) await say(ui, line);
+  ui.busy = false;
   render(ui);
 }
 
-const SLOT_ZONES = (g, side) => [
-  ...(g.players[side].active ? [{ zone: 'active', i: 0, s: g.players[side].active }] : []),
-  ...g.players[side].bench.map((s, i) => ({ zone: 'bench', i, s })),
-];
+// ---------- Affichage ----------
 
-function slotHtml(ui, side, zone, i, s, targets) {
-  const g = ui.g;
-  if (!s) return `<div class="bslot empty ${zone}"></div>`;
-  const c = topCard(g, s);
-  const hp = hpLeft(g, s), max = maxHp(g, s);
-  const tkey = `${side}|${zone}|${i}`;
-  const isTarget = targets.has(tkey);
-  return `
-    <button class="bslot ${zone} ${isTarget ? 'target' : ''} ${s.status ? `st-${s.status}` : ''}" data-slot="${tkey}" title="${esc(c.name)}">
-      <img src="${c.img}" alt="${esc(c.name)}">
-      <span class="hpbar"><i style="width:${Math.max(0, (hp / max) * 100)}%"></i></span>
-      <span class="hp">${Math.max(0, hp)}/${max}</span>
-      ${s.damage ? `<span class="dmg">${s.damage}</span>` : ''}
-      <span class="energies">${s.energies.map(uid => dot(energyType(card(g, uid)))).join('')}</span>
-      ${s.status ? `<span class="status">${STATUS_FR[s.status]}</span>` : ''}
-      ${s.tools.length ? '<span class="tool" title="Outil attaché">🔧</span>' : ''}
-    </button>`;
+function targetSet(ui) {
+  const g = ui.g, me = g.players[0], t = new Set();
+  const ref = (side, zone, i) => `${side}|${zone}|${zone === 'active' ? 0 : i}`;
+  if (g.pending?.type === 'promote' && g.pending.players.includes(0)) me.bench.forEach((_, i) => t.add(ref(0, 'bench', i)));
+  else if (ui.mode === 'retreat') me.bench.forEach((_, i) => t.add(ref(0, 'bench', i)));
+  else if (ui.sel != null) {
+    for (const a of ui.selActions ?? []) {
+      if (a.zone) t.add(ref(0, a.zone, a.i));
+      if (a.target?.zone) t.add(ref(a.target.side, a.target.zone, a.target.i));
+    }
+  }
+  return t;
 }
 
-function handCard(ui, uid, playable, selected) {
+function fighterHtml(ui, side, targets) {
+  const g = ui.g, s = g.players[side].active;
+  if (!s) return '';
+  const c = topCard(g, s);
+  return `
+    <div class="fighter ${side ? 'foe' : 'me'} ${s.status ? `st-${s.status}` : ''} ${targets.has(`${side}|active|0`) ? 'target' : ''}"
+      data-key="${keyOf(side, s)}" data-slot="${side}|active|0" data-uid="${s.stack[s.stack.length - 1]}">
+      <div class="fshadow"></div>
+      <div class="bcard"><img src="${c.imgHi ?? c.img}" alt="${esc(c.name)}"><i class="bshine"></i></div>
+    </div>`;
+}
+
+function hpBox(ui, side) {
+  const g = ui.g, p = g.players[side], s = p.active;
+  if (!s) return '';
+  const c = topCard(g, s);
+  const max = maxHp(g, s), hp = Math.max(0, hpLeft(g, s)), pct = hp / max;
+  const balls = Array.from({ length: 6 }, (_, i) => `<i class="${i < p.prizes.length ? 'on' : ''}"></i>`).join('');
+  return `
+    <div class="hpbox ${side ? 'foe' : 'me'}" data-hp="${side}">
+      <div class="hb-top"><b class="hb-name">${s ? esc(c.name) : '—'}</b>
+        ${s?.status ? `<span class="st st-${s.status}" title="${STATUS_FR[s.status]}">${STATUS_SHORT[s.status]}</span>` : ''}
+        <span class="hb-prizes" title="${p.prizes.length} Récompense${p.prizes.length > 1 ? 's' : ''} restante${p.prizes.length > 1 ? 's' : ''}">${balls}</span></div>
+      <div class="hb-bar"><span>PV</span><div class="bar ${hpClass(pct)}"><i style="width:${pct * 100}%"></i></div></div>
+      <div class="hb-bottom"><span class="hb-en">${s ? s.energies.map(uid => dot(energyType(card(g, uid)))).join('') : ''}${s?.tools.length ? '<span title="Outil attaché">🔧</span>' : ''}</span>
+        <b class="hb-num">${hp}/${max}</b></div>
+      <div class="hb-meta">${esc(p.name)} · Main ${p.hand.length} · Deck ${p.deck.length}</div>
+    </div>`;
+}
+
+function benchRow(ui, side, targets) {
+  const g = ui.g, p = g.players[side];
+  return `<div class="benchrow ${side ? 'foe' : 'me'}">${[0, 1, 2, 3, 4].map(i => {
+    const s = p.bench[i];
+    if (!s) return '<span class="mini empty"></span>';
+    const c = topCard(g, s), max = maxHp(g, s), hp = Math.max(0, hpLeft(g, s));
+    return `<button class="mini ${targets.has(`${side}|bench|${i}`) ? 'target' : ''}" data-slot="${side}|bench|${i}" data-key="${keyOf(side, s)}"
+      data-uid="${s.stack[s.stack.length - 1]}" title="${esc(c.name)} · ${hp}/${max} PV">
+      <img src="${c.img}" alt="${esc(c.name)}"><span class="mbar ${hpClass(hp / max)}"><i style="width:${(hp / max) * 100}%"></i></span>
+      ${s.energies.length ? `<b class="men">${s.energies.length}</b>` : ''}</button>`;
+  }).join('')}</div>`;
+}
+
+function renderArena(ui) {
+  const g = ui.g, targets = targetSet(ui);
+  ui.arena.querySelector('.fighters').innerHTML = fighterHtml(ui, 1, targets) + fighterHtml(ui, 0, targets);
+  ui.arena.querySelector('.hud').innerHTML = `
+    ${g.stadium ? `<div class="stadium-tag">Stade : ${esc(card(g, g.stadium.uid).name)}</div>` : ''}
+    <div class="side foe">${hpBox(ui, 1)}${benchRow(ui, 1, targets)}</div>
+    <div class="side me">${benchRow(ui, 0, targets)}${hpBox(ui, 0)}</div>`;
+}
+
+function handCardHtml(ui, uid, label, { playable = false, selected = false, badge = '' } = {}) {
   const c = card(ui.g, uid);
   const art = c.img ? `<img src="${c.img}" alt="${esc(c.name)}">` : `<span class="energy-card" style="--t:${TYPE_HEX[c.play.colors?.[0]] ?? '#999'}">${esc(c.play.colors?.[0] ?? '')}</span>`;
-  return `<button class="hcard ${playable ? 'playable' : ''} ${selected ? 'sel' : ''}" data-hand="${uid}" title="${esc(c.name)}">${art}</button>`;
+  return `<button class="hcard ${playable ? 'playable' : ''} ${selected ? 'sel' : ''}" data-hand="${uid}" data-uid="${uid}" title="${esc(c.name)}">
+    ${art}${badge ? `<b class="hbadge">${badge}</b>` : ''}${label ? `<small class="hlabel">${label}</small>` : ''}</button>`;
 }
 
-function render(ui) {
+const ACTION_LABEL = { bench: 'Banc', evolve: 'Évoluer', energy: 'Attacher', trainer: 'Jouer' };
+
+function slotButton(ui, ref) {
+  const [side, zone, i] = ref.split('|');
+  const s = slotAt(ui.g, +side, zone, +i);
+  if (!s) return '';
+  const c = topCard(ui.g, s), max = maxHp(ui.g, s), hp = Math.max(0, hpLeft(ui.g, s));
+  return `<button class="tpick ${side === '1' ? 'foe' : ''}" data-slot="${ref}" data-uid="${s.stack[s.stack.length - 1]}">
+    <img src="${c.img}" alt=""><span><b>${esc(c.name)}</b><small>${side === '1' ? 'Adversaire · ' : ''}${zone === 'active' ? 'Actif' : 'Banc'} · ${hp}/${max} PV · ${s.energies.length} Énergie${s.energies.length > 1 ? 's' : ''}</small></span></button>`;
+}
+
+function consoleView(ui) {
   const g = ui.g;
-  const board = app.querySelector('.board');
-  if (!board) return;
-  const me = g.players[0], foe = g.players[1];
-  const myTurn = g.current === 0 && !g.pending && g.winner == null;
-  const actions = myTurn && !ui.busy ? legalActions(g) : [];
-
-  // Cibles possibles selon la sélection en cours.
-  const targets = new Set();
-  let banner = '';
-  if (g.pending?.type === 'setup') {
-    banner = ui.setupPick.length ? 'Ajoute des Pokémon de base sur ton Banc (facultatif), puis valide.' : 'Choisis ton Pokémon Actif parmi tes Pokémon de base.';
-  } else if (g.pending?.type === 'promote' && g.pending.players.includes(0)) {
-    banner = 'Ton Pokémon Actif est K.O. : choisis un Pokémon de ton Banc.';
-    me.bench.forEach((_, i) => targets.add(`0|bench|${i}`));
-  } else if (ui.mode === 'retreat') {
-    banner = `Retraite (coût ${retreatCost(g, me.active)}) : choisis le Pokémon qui passe Actif.`;
-    me.bench.forEach((_, i) => targets.add(`0|bench|${i}`));
-  } else if (ui.sel != null) {
-    for (const a of ui.selActions ?? []) {
-      if (a.zone) targets.add(`0|${a.zone}|${a.i}`);
-      if (a.target) targets.add(`${a.target.side}|${a.target.zone}|${a.target.zone === 'active' ? 0 : a.target.i}`);
-    }
-    banner = `${card(g, ui.sel).name} : choisis une cible.`;
-  } else if (!myTurn && g.winner == null) banner = `${foe.name} réfléchit…`;
-
-  const playableUids = new Set(actions.filter(a => a.uid != null).map(a => a.uid));
-  // Les cartes identiques sont regroupées dans legalActions : on autorise toutes les copies.
-  const playableNames = new Set([...playableUids].map(uid => card(g, uid).name));
-  const atk = myTurn && me.active ? attackable(g, 0).map(x => x.i) : [];
-  const setupBasics = g.pending?.type === 'setup';
-
-  board.innerHTML = `
-    <div class="bside foe">
-      <div class="binfo"><b>${esc(foe.name)}</b> · Main ${foe.hand.length} · Deck ${foe.deck.length} · Défausse ${foe.discard.length}
-        <span class="prizes">${'<i></i>'.repeat(foe.prizes.length)}</span></div>
-      <div class="bench">${[0, 1, 2, 3, 4].map(i => slotHtml(ui, 1, 'bench', i, foe.bench[i], targets)).join('')}</div>
-      <div class="activezone">${slotHtml(ui, 1, 'active', 0, foe.active, targets)}</div>
-    </div>
-    <div class="bmid">
-      <div class="turnline">${g.winner != null ? '' : `Tour ${g.turn} · ${g.current === 0 ? '<b class="accent">à toi de jouer</b>' : esc(foe.name)}`}${g.stadium ? ` · Stade : ${esc(card(g, g.stadium.uid).name)}` : ''}</div>
-      ${banner ? `<div class="banner">${esc(banner)}</div>` : ''}
-      <div class="blog">${g.log.slice(-7).map(l => `<p>${esc(l)}</p>`).join('')}</div>
-      <div class="bactions">
-        ${setupBasics ? `<button class="btn primary" data-setup-ok ${ui.setupPick.length ? '' : 'disabled'}>Valider</button>` : ''}
-        ${myTurn ? (topCard(g, me.active).play.atk ?? []).map((a, i) => `
-          <button class="btn atk ${atk.includes(i) ? '' : 'off'}" data-attack="${i}" ${atk.includes(i) ? '' : 'disabled'} title="${esc(a.e ?? '')}">
-            <span class="cost">${(a.c ?? []).map(dot).join('')}</span> ${esc(a.n)} <b>${esc(String(a.d ?? ''))}</b></button>`).join('') : ''}
-        ${myTurn && canRetreat(g, 0) ? `<button class="btn ghost" data-retreat>Retraite (${retreatCost(g, me.active)})</button>` : ''}
-        ${ui.sel != null || ui.mode ? '<button class="btn ghost" data-cancel>Annuler</button>' : ''}
-        ${myTurn ? '<button class="btn" data-end>Fin du tour</button>' : ''}
-      </div>
-    </div>
-    <div class="bside me">
-      <div class="activezone">${slotHtml(ui, 0, 'active', 0, me.active, targets)}</div>
-      <div class="bench">${[0, 1, 2, 3, 4].map(i => slotHtml(ui, 0, 'bench', i, me.bench[i], targets)).join('')}</div>
-      <div class="binfo"><b>Toi</b> · Deck ${me.deck.length} · Défausse ${me.discard.length} <span class="prizes">${'<i></i>'.repeat(me.prizes.length)}</span></div>
-      <div class="hand">${me.hand.map(uid => handCard(ui, uid,
-        setupBasics ? isBasic(card(g, uid)) && !ui.setupPick.includes(uid) : playableNames.has(card(g, uid).name) && playableUids.size > 0,
-        ui.sel === uid || ui.setupPick.includes(uid))).join('')}</div>
-    </div>
-    <aside class="bpreview">${ui.preview ? previewHtml(ui, ui.preview) : '<p>Survole une carte pour la voir en grand.</p>'}</aside>
-    ${g.winner != null ? `
-      <div class="bover ${g.winner === 0 ? 'win' : 'lose'}">
-        <h2>${g.winner === 0 ? '🏆 Victoire !' : 'Défaite…'}</h2>
-        <p>${esc(g.reason)}</p>
-        <p class="row-btns"><a class="btn primary" href="#/combat" data-again>Rejouer</a></p>
-      </div>` : ''}`;
-
-  const logBox = board.querySelector('.blog');
-  if (logBox) logBox.scrollTop = logBox.scrollHeight;
-  feedback(ui, board);
-  bind(ui);
-  if (g.winner != null && !ui.done) { ui.done = true; recordBattle(`pokemon/${ui.level}`, g.winner === 0); }
-  if (g.current === 1 && !g.pending && g.winner == null && !ui.busy) aiTurn(ui);
-  if (g.pending?.type === 'promote' && g.pending.players[0] === 1) { promote(g, 1, bestPromotion(g, 1)); render(ui); }
+  if (g.winner != null) return 'end';
+  if (g.pending?.type === 'setup') return ui.busy ? 'wait' : 'setup';
+  if (g.pending?.type === 'promote' && g.pending.players.includes(0) && !ui.busy) return 'promote';
+  if (ui.busy || g.current !== 0 || g.pending) return 'wait';
+  if (ui.sel != null || ui.mode === 'retreat') return 'target';
+  return ui.view;
 }
 
-// Sons et impacts : on compare avec l'affichage précédent (dégâts reçus, K.O., cartes jouées, fin de partie).
-function feedback(ui, board) {
-  const g = ui.g, prev = ui.fx;
-  const now = { dmg: {}, prizes: g.players.map(p => p.prizes.length), hand: g.players.map(p => p.hand.length) };
-  for (const side of [0, 1]) {
-    for (const { zone, i, s } of SLOT_ZONES(g, side)) {
-      const key = `${side}|${s.stack[0]}`;
-      now.dmg[key] = s.damage;
-      const diff = s.damage - (prev?.dmg[key] ?? s.damage);
-      if (diff <= 0) continue;
-      const el = board.querySelector(`[data-slot="${side}|${zone}|${zone === 'active' ? 0 : i}"]`);
-      if (!el) continue;
-      el.classList.add('hit');
-      el.insertAdjacentHTML('beforeend', `<span class="dmg-pop">-${diff}</span>`);
-      const { x, y } = fx.center(el);
-      fx.burst(x, y, { n: 26, colors: ['#fff', '#ffb347', '#e5484d'], speed: 7, shapes: ['spark', 'star'], life: 40 });
-      sfx.hit(diff);
-    }
+function renderConsole(ui) {
+  if (!alive(ui)) return;
+  const g = ui.g, me = g.players[0], foe = g.players[1];
+  const view = consoleView(ui);
+  const fastBtn = `<button class="cfast ${ui.fast ? 'on' : ''}" data-fast title="Animations plus rapides">⏩ ${ui.fast ? 'Rapide' : 'Normal'}</button>`;
+  let body = '';
+  if (view === 'wait') {
+    body = `<div class="cprompt wait">${g.current === 1 && g.winner == null ? `${esc(foe.name)} réfléchit<span class="dots3"><i>.</i><i>.</i><i>.</i></span>` : '…'}</div>`;
+  } else if (view === 'setup') {
+    body = `
+      <div class="cprompt">${ui.setupPick.length ? 'Ajoute des Pokémon de base sur ton Banc (facultatif), puis valide.' : 'Choisis ton Pokémon <b>Actif</b> parmi tes Pokémon de base.'}</div>
+      <div class="handrow">${me.hand.map(uid => {
+        const k = ui.setupPick.indexOf(uid);
+        return handCardHtml(ui, uid, '', { playable: isBasic(card(g, uid)) && k < 0, selected: k >= 0, badge: k === 0 ? 'Actif' : k > 0 ? 'Banc' : '' });
+      }).join('')}</div>
+      <div class="crow"><button class="cbtn fight" data-setup-ok ${ui.setupPick.length ? '' : 'disabled'}>✔ Valider</button></div>`;
+  } else if (view === 'promote') {
+    body = `
+      <div class="cprompt">Ton Pokémon Actif est K.O. ! Qui envoies-tu ?</div>
+      <div class="targets">${me.bench.map((_, i) => slotButton(ui, `0|bench|${i}`)).join('')}</div>`;
+  } else if (view === 'target') {
+    body = `
+      <div class="cprompt">${ui.mode === 'retreat' ? `Retraite (coût ${retreatCost(g, me.active)}) : qui passe Actif ?` : `<b>${esc(card(g, ui.sel).name)}</b> : choisis une cible.`}</div>
+      <div class="targets">${[...targetSet(ui)].map(ref => slotButton(ui, ref)).join('')}</div>
+      <div class="crow"><button class="cbtn back" data-cancel>✕ Annuler</button></div>`;
+  } else if (view === 'attack') {
+    const top = topCard(g, me.active), ok = attackable(g, 0).map(x => x.i);
+    const why = g.turn === 1 && g.current === g.first ? 'Pas d\'attaque au premier tour du joueur qui commence.'
+      : ['sleep', 'paralysis'].includes(me.active.status) ? `${esc(top.name)} est ${STATUS_FR[me.active.status]} : il ne peut pas attaquer.` : '';
+    body = `
+      <div class="cprompt">Quelle attaque ? <small>Énergies : ${me.active.energies.map(uid => dot(energyType(card(g, uid)))).join('') || 'aucune'}</small></div>
+      ${why ? `<p class="cnote">${why}</p>` : ''}
+      <div class="moves">${(top.play.atk ?? []).map((a, i) => {
+        const t = (a.c ?? []).find(x => x !== 'Incolore') ?? typeOf(top);
+        return `<button class="move ${ok.includes(i) ? '' : 'off'}" style="--t:${TYPE_HEX[t] ?? '#999'}" data-attack="${i}" ${ok.includes(i) ? '' : 'disabled'}>
+          <span class="mv-head"><b>${esc(a.n)}</b><em>${esc(String(a.d ?? ''))}</em></span>
+          <span class="mv-cost">${(a.c ?? []).map(dot).join('') || '<small>Gratuit</small>'}</span>
+          ${a.e ? `<small class="mv-text">${esc(a.e)}</small>` : ''}</button>`;
+      }).join('') || '<p class="cnote">Cette carte n\'a pas d\'attaque.</p>'}</div>
+      <div class="crow"><button class="cbtn back" data-go="main">← Retour</button></div>`;
+  } else if (view === 'bag') {
+    const actions = legalActions(g);
+    const byName = name => actions.filter(a => a.uid != null && card(g, a.uid).name === name);
+    body = `
+      <div class="cprompt">Ta main <small>${me.hand.length} carte${me.hand.length > 1 ? 's' : ''} · Énergie ${me.energy ? 'déjà attachée' : 'disponible'} · Supporter ${me.supporter ? 'déjà joué' : 'disponible'}</small></div>
+      <div class="handrow">${me.hand.map(uid => {
+        const acts = byName(card(g, uid).name);
+        return handCardHtml(ui, uid, acts.length ? ACTION_LABEL[acts[0].type] : '', { playable: acts.length > 0 });
+      }).join('') || '<p class="cnote">Ta main est vide.</p>'}</div>
+      <div class="crow"><button class="cbtn back" data-go="main">← Retour</button></div>`;
+  } else if (view === 'team') {
+    body = `
+      <div class="cprompt">Ton équipe <small>Banc ${me.bench.length}/5 · Deck ${me.deck.length} · Défausse ${me.discard.length}</small></div>
+      <div class="targets">${[me.active ? slotButton(ui, '0|active|0') : '', ...me.bench.map((_, i) => slotButton(ui, `0|bench|${i}`))].join('')}</div>
+      <div class="crow">
+        ${canRetreat(g, 0) ? `<button class="cbtn team" data-retreat>↩ Retraite (coût ${retreatCost(g, me.active)})</button>`
+          : `<span class="cnote">${me.retreated ? 'Déjà battu en retraite ce tour.' : !me.bench.length ? 'Aucun Pokémon sur le Banc.' : `Retraite : il faut ${retreatCost(g, me.active)} Énergie(s) attachée(s).`}</span>`}
+        <button class="cbtn back" data-go="main">← Retour</button></div>`;
+  } else if (view === 'end') {
+    body = `
+      <div class="cprompt">${g.winner === 0 ? '🏆 Victoire !' : 'Défaite…'} <small>${esc(g.reason)}</small></div>
+      <div class="crow"><a class="cbtn fight" href="#/combat" data-again>⚔ Rejouer</a><a class="cbtn back" href="#/decks/jeu/pokemon">Mes decks</a></div>`;
+  } else {
+    const playable = new Set(legalActions(g).filter(a => a.uid != null).map(a => card(g, a.uid).name));
+    const nPlay = me.hand.filter(uid => playable.has(card(g, uid).name)).length;
+    const nAtk = attackable(g, 0).length;
+    body = `
+      <div class="cprompt">Que doit faire <b>${esc(me.active ? topCard(g, me.active).name : '…')}</b> ?</div>
+      <div class="cmain">
+        <button class="cbtn fight big" data-go="attack"><span class="ci">⚔</span>Attaque<small>${nAtk ? `${nAtk} attaque${nAtk > 1 ? 's' : ''} possible${nAtk > 1 ? 's' : ''}` : 'aucune attaque possible'}</small></button>
+        <button class="cbtn bag" data-go="bag"><span class="ci">🎒</span>Sac<small>${me.hand.length} cartes · ${nPlay} jouable${nPlay > 1 ? 's' : ''}</small></button>
+        <button class="cbtn team" data-go="team"><span class="ci">◓</span>Pokémon<small>Banc ${me.bench.length}/5</small></button>
+        <button class="cbtn run" data-end><span class="ci">⏭</span>Fin du tour<small>Tour ${g.turn}</small></button>
+      </div>`;
   }
-  if (prev) {
-    if (now.prizes.some((n, side) => n < prev.prizes[side])) setTimeout(() => sfx.ko(), 250);
-    else if (now.hand.some((n, side) => n < prev.hand[side])) sfx.play();
-  }
-  if (g.winner != null && !ui.fxDone) {
-    ui.fxDone = true;
-    if (g.winner === 0) { setTimeout(() => { sfx.win(); fx.confettiRain(); }, 400); } else setTimeout(() => sfx.lose(), 400);
-  }
-  ui.fx = now;
+  ui.root.querySelector('.console').innerHTML = `<div class="cview v-${view}">${fastBtn}${body}</div>`;
 }
 
 function previewHtml(ui, uid) {
@@ -259,82 +360,345 @@ function previewHtml(ui, uid) {
   return `<img src="${c.imgHi ?? c.img}" alt="${esc(c.name)}">${atks}${c.play.text ? `<p class="atk-text">${esc(c.play.text)}</p>` : ''}`;
 }
 
-function bind(ui) {
-  const g = ui.g;
-  const board = app.querySelector('.board');
-  board.onmouseover = e => {
-    const t = e.target.closest('[data-hand], [data-slot]'); if (!t) return;
-    let uid;
-    if (t.dataset.hand != null) uid = +t.dataset.hand;
-    else { const [side, zone, i] = t.dataset.slot.split('|'); const p = g.players[+side]; const sl = zone === 'active' ? p.active : p.bench[+i]; if (sl) uid = sl.stack[sl.stack.length - 1]; }
-    if (uid == null || uid === ui.preview) return;
-    ui.preview = uid;
-    const box = board.querySelector('.bpreview');
-    if (box) box.innerHTML = previewHtml(ui, uid);
+/** Après chaque affichage : carte qui entre sur le terrain, évolution, Énergie qui apparaît, carte posée sur le Banc. */
+function postEffects(ui) {
+  const g = ui.g, prev = ui.shown;
+  const now = {
+    active: [0, 1].map(side => { const s = g.players[side].active; return s ? { base: s.stack[0], top: s.stack[s.stack.length - 1], en: s.energies.length } : null; }),
+    bench: new Set([0, 1].flatMap(side => g.players[side].bench.map(s => keyOf(side, s)))),
   };
-  board.onclick = e => {
-    const t = e.target.closest('button, a'); if (!t || ui.busy) return;
-    if (t.dataset.again != null) return;
+  for (const side of [0, 1]) {
+    const a = now.active[side], b = prev?.active[side];
+    const el = ui.arena.querySelector(`.fighter.${side ? 'foe' : 'me'}`);
+    if (!a || !el) continue;
+    if (!b || b.base !== a.base) {
+      el.classList.add('sendout');
+      setTimeout(() => {
+        sfx.sendOut();
+        const { x, y } = fx.center(el);
+        fx.burst(x, y + el.offsetHeight * 0.3, { n: 36, colors: ['#ffffff', '#ff5a5a', '#ffd36b'], speed: 8, shapes: ['star', 'spark'], life: 45 });
+      }, 150);
+    } else if (b.top !== a.top) {
+      el.classList.add('evolve');
+      sfx.evolve();
+      setTimeout(() => { const { x, y } = fx.center(el); fx.flash('#ffffff', 0.5, 600); fx.burst(x, y, { n: 80, colors: ['#ffffff', '#bfe3ff', '#ffd36b'], speed: 9, shapes: ['star', 'spark', 'dot'] }); }, 780);
+    }
+    if (b && b.base === a.base && a.en > b.en) ui.arena.querySelector(`[data-hp="${side}"] .hb-en .edot:last-of-type`)?.classList.add('pop');
+  }
+  for (const key of now.bench) {
+    if (prev && !prev.bench.has(key)) ui.arena.querySelector(`.mini[data-key="${key}"]`)?.classList.add('enter');
+  }
+  ui.shown = now;
+}
+
+function render(ui) {
+  if (!alive(ui)) return;
+  const g = ui.g;
+  renderArena(ui);
+  renderConsole(ui);
+  postEffects(ui);
+  if (g.winner != null) return showEnd(ui);
+  if (ui.busy || ui.aiRunning) return;
+  if (g.current === 1 && !g.pending) aiTurn(ui);
+  else if (g.pending?.type === 'promote' && g.pending.players[0] === 1) perform(ui, () => promote(g, 1, bestPromotion(g, 1)), { side: 1 });
+}
+
+function showEnd(ui) {
+  if (ui.done) return;
+  ui.done = true;
+  const won = ui.g.winner === 0;
+  recordBattle(`pokemon/${ui.level}`, won);
+  bgm.stop();
+  ui.arena.querySelector('.overlay').innerHTML = `
+    <div class="bover ${won ? 'win' : 'lose'}"><h2>${won ? '🏆 Victoire !' : 'Défaite…'}</h2><p>${esc(ui.g.reason)}</p></div>`;
+  setTimeout(() => { if (won) { sfx.win(); fx.confettiRain(); fx.flash('#ffd36b', 0.4, 800); } else sfx.lose(); }, 300);
+}
+
+// ---------- Messages et animations ----------
+
+async function say(ui, text) {
+  const box = ui.root?.querySelector('.msgbox p');
+  if (!box) return;
+  text = text.replace(/^💥 /, '');
+  ui.skip = false;
+  box.parentElement.classList.remove('done');
+  for (let i = 1; i <= text.length && !ui.skip && alive(ui); i += 2) {
+    box.textContent = text.slice(0, i);
+    await sleep(ui.fast ? 6 : 14);
+  }
+  box.textContent = text;
+  box.parentElement.classList.add('done');
+  ui.skip = false;
+  const end = performance.now() + (ui.fast ? 300 : 700);
+  while (performance.now() < end && !ui.skip && alive(ui)) await sleep(25);
+  ui.skip = false;
+}
+
+function snapshot(g) {
+  const slots = {};
+  for (const side of [0, 1]) {
+    for (const s of [g.players[side].active, ...g.players[side].bench].filter(Boolean)) {
+      slots[keyOf(side, s)] = { side, damage: s.damage, energies: s.energies.length, active: s === g.players[side].active };
+    }
+  }
+  return { slots, log: g.log.length };
+}
+
+const elOf = (ui, key) => ui.arena.querySelector(`[data-key="${key}"]`);
+
+/** PV qui descendent (ou remontent) jusqu'aux nouvelles valeurs, avec impact sur les cartes touchées. */
+async function drain(ui, before) {
+  const g = ui.g, after = snapshot(g);
+  let any = false;
+  for (const [key, b] of Object.entries(before.slots)) {
+    const a = after.slots[key];
+    if (!a || a.damage === b.damage) continue;
+    any = true;
+    const [side] = key.split('|').map(Number);
+    const s = [g.players[side].active, ...g.players[side].bench].find(x => x && keyOf(side, x) === key);
+    const max = maxHp(g, s), from = Math.max(0, max - b.damage), to = Math.max(0, max - a.damage);
+    const el = elOf(ui, key);
+    const hit = a.damage > b.damage;
+    if (el && hit) {
+      el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit');
+      el.insertAdjacentHTML('beforeend', `<span class="dmg-pop">-${a.damage - b.damage}</span>`);
+    }
+    if (b.active && a.active) {
+      const box = ui.arena.querySelector(`[data-hp="${side}"]`);
+      const bar = box?.querySelector('.bar'), fill = bar?.querySelector('i'), num = box?.querySelector('.hb-num');
+      if (fill) fill.style.width = `${(to / max) * 100}%`;
+      if (bar) bar.className = `bar ${hpClass(to / max)}`;
+      if (side === 0 && from / max > 0.2 && to / max <= 0.2 && to > 0) sfx.lowHp();
+      if (num) countTo(num, from, to, max, ui.fast ? 350 : 700);
+    } else if (el) {
+      const m = el.querySelector('.mbar');
+      if (m) { m.className = `mbar ${hpClass(to / max)}`; m.firstElementChild.style.width = `${(to / max) * 100}%`; }
+    }
+  }
+  if (any) await wait(ui, 750);
+}
+
+function countTo(el, from, to, max, ms) {
+  const t0 = performance.now();
+  const step = now => {
+    const p = Math.min(1, (now - t0) / ms);
+    el.textContent = `${Math.round(from + (to - from) * p)}/${max}`;
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+async function attackAnim(ui, side, before) {
+  const g = ui.g;
+  const att = ui.arena.querySelector(`.fighter.${side ? 'foe' : 'me'}`);
+  const def = ui.arena.querySelector(`.fighter.${side ? 'me' : 'foe'}`);
+  if (!att) return drain(ui, before);
+  const attCard = card(g, +att.dataset.uid);
+  const type = typeOf(attCard), tfx = TYPE_FX[type] ?? TYPE_FX.Incolore;
+  ui.arena.classList.add(side ? 'cam-foe' : 'cam-me');
+  await wait(ui, 380);
+  att.classList.add('lunge');
+  sfx.attack(type);
+  if (def) {
+    const a = fx.center(att.querySelector('.bcard')), d = fx.center(def.querySelector('.bcard'));
+    fx.travel(a, d, { colors: tfx.colors, n: 46, ms: ui.fast ? 200 : 380, size: 4, shapes: tfx.shapes.filter(x => x !== 'confetti').concat('dot') });
+  }
+  await wait(ui, 520);
+  ui.arena.classList.remove('cam-me', 'cam-foe');
+  ui.arena.classList.add(side ? 'cam-me' : 'cam-foe');
+  const dmg = def ? (snapshot(g).slots[def.dataset.key]?.damage ?? 0) - (before.slots[def.dataset.key]?.damage ?? 0) : 0;
+  if (def && dmg > 0) {
+    const d = fx.center(def.querySelector('.bcard'));
+    fx.shockwave(d.x, d.y, tfx.colors[0], { size: 200 + Math.min(200, dmg * 2) });
+    fx.burst(d.x, d.y, { n: 50 + Math.min(80, dmg), colors: tfx.colors, speed: 9, shapes: tfx.shapes, life: 55 });
+    if (dmg >= 100) { fx.flash(tfx.colors[0], 0.35, 500); ui.arena.classList.add('quake'); setTimeout(() => ui.arena.classList.remove('quake'), 500); }
+    sfx.hit(dmg);
+  }
+  att.classList.remove('lunge');
+  await drain(ui, before);
+  ui.arena.classList.remove('cam-me', 'cam-foe');
+}
+
+async function faint(ui, keys) {
+  let any = false;
+  for (const key of keys) {
+    const el = elOf(ui, key);
+    if (!el || el.classList.contains('faint')) continue;
+    el.classList.add('faint');
+    any = true;
+  }
+  if (any) { sfx.faint(); await wait(ui, 1000); }
+}
+
+async function turnBanner(ui, n, name) {
+  const mine = name === ui.g.players[0].name;
+  const o = ui.arena.querySelector('.overlay');
+  o.insertAdjacentHTML('beforeend', `<div class="tbanner ${mine ? 'me' : 'foe'}"><small>Tour ${n}</small><b>${mine ? 'À toi de jouer !' : `Au tour de ${esc(name)}`}</b></div>`);
+  sfx.turn();
+  await wait(ui, 1100);
+  o.querySelector('.tbanner')?.remove();
+}
+
+async function trainerShow(ui, uid) {
+  const c = card(ui.g, uid);
+  if (!c?.img) return;
+  const o = ui.arena.querySelector('.overlay');
+  o.insertAdjacentHTML('beforeend', `<div class="tshow"><img src="${c.imgHi ?? c.img}" alt=""></div>`);
+  sfx.whoosh(0.15);
+  await wait(ui, 1100);
+  o.querySelector('.tshow')?.remove();
+}
+
+function energyFly(ui, before, side) {
+  const g = ui.g, after = snapshot(g);
+  const key = Object.keys(after.slots).find(k => after.slots[k].energies > (before.slots[k]?.energies ?? 0));
+  if (!key) return;
+  const [sd] = key.split('|').map(Number);
+  const s = [g.players[sd].active, ...g.players[sd].bench].find(x => x && keyOf(sd, x) === key);
+  const type = energyType(card(g, s.energies[s.energies.length - 1]));
+  const to = elOf(ui, key);
+  if (!to) return;
+  const r = ui.arena.getBoundingClientRect();
+  const from = side ? { x: r.right - 60, y: r.top + 30 } : { x: r.left + r.width / 2, y: r.bottom + 30 };
+  fx.travel(from, fx.center(to), { colors: [TYPE_HEX[type] ?? '#fff', '#ffffff'], n: 22, ms: 250, size: 3.5 });
+  sfx.energy(type);
+}
+
+/** Rejoue le journal d'une action : messages un par un, avec les animations qui vont avec. */
+async function playback(ui, before, { side = 0, action = null, lines = null } = {}) {
+  const g = ui.g;
+  const list = lines ?? g.log.slice(before.log);
+  const after = snapshot(g);
+  const gone = Object.keys(before.slots).filter(k => !after.slots[k]);
+  let drained = false;
+  for (const line of list) {
+    if (!alive(ui)) return;
+    let m;
+    if (/ utilise .+ !$/.test(line)) { await say(ui, line); await attackAnim(ui, side, before); drained = true; continue; }
+    if (/subit \d+ dégâts de (poison|brûlure)/.test(line)) { await say(ui, line); await drain(ui, before); drained = true; continue; }
+    if (/est K\.O\./.test(line)) { if (!drained) { await drain(ui, before); drained = true; } await faint(ui, gone); await say(ui, line); continue; }
+    if ((m = line.match(/^— Tour (\d+) : (.+) —$/))) { await turnBanner(ui, m[1], m[2]); continue; }
+    if (/^🏆/.test(line)) continue;
+    if (/ attache .+ à /.test(line)) energyFly(ui, before, side);
+    if (action?.type === 'trainer' && / joue /.test(line)) await trainerShow(ui, action.uid);
+    if (/ sur son Banc\.$/.test(line)) sfx.play();
+    if (/bat en retraite/.test(line)) sfx.whoosh(0.2);
+    await say(ui, line);
+  }
+  if (!drained) await drain(ui, before);
+  if (gone.length) await faint(ui, gone);
+}
+
+/** Joue une action : le moteur change l'état, puis on rejoue les animations, puis on réaffiche. */
+async function perform(ui, fn, info = {}) {
+  const keepBusy = ui.aiRunning;
+  ui.busy = true;
+  ui.sel = null; ui.selActions = null; ui.mode = null; ui.view = 'main';
+  renderConsole(ui);
+  const before = snapshot(ui.g);
+  fn();
+  await playback(ui, before, info);
+  if (!keepBusy) ui.busy = false;
+  render(ui);
+}
+
+async function aiTurn(ui) {
+  const g = ui.g;
+  ui.aiRunning = true; ui.busy = true;
+  renderConsole(ui);
+  await wait(ui, 500);
+  for (let guard = 0; guard < 60 && alive(ui) && g.current === 1 && g.winner == null; guard++) {
+    if (g.pending) {
+      if (g.pending.type === 'promote' && g.pending.players[0] === 1) await perform(ui, () => promote(g, 1, bestPromotion(g, 1)), { side: 1 });
+      else break; // c'est au joueur de choisir (son Actif a été mis K.O.)
+      continue;
+    }
+    const action = chooseAction(g, 1, ui.level);
+    await perform(ui, () => apply(g, action), { side: 1, action });
+    await wait(ui, 200);
+  }
+  ui.aiRunning = false; ui.busy = false;
+  render(ui);
+}
+
+async function doSetup(ui) {
+  const g = ui.g;
+  ui.busy = true;
+  renderConsole(ui);
+  const logLen = g.log.length;
+  setup(g, [ui.setupPick, chooseSetup(g, 1)]);
+  ui.setupPick = [];
+  renderArena(ui);
+  postEffects(ui);
+  await wait(ui, 400);
+  await say(ui, `${g.players[1].name} envoie ${topCard(g, g.players[1].active).name} !`);
+  await say(ui, `Go ! ${topCard(g, g.players[0].active).name} !`);
+  await playback(ui, snapshot(g), { lines: g.log.slice(logLen) });
+  ui.busy = false;
+  render(ui);
+}
+
+// ---------- Clics ----------
+
+function bind(ui) {
+  const g = ui.g, root = ui.root;
+  root.addEventListener('mouseover', e => {
+    const t = e.target.closest('[data-uid]'); if (!t) return;
+    const uid = +t.dataset.uid;
+    if (uid === ui.preview) return;
+    ui.preview = uid;
+    root.querySelector('.bpreview').innerHTML = previewHtml(ui, uid);
+  });
+  root.addEventListener('click', e => {
+    if (e.target.closest('.msgbox')) { ui.skip = true; return; }
+    const t = e.target.closest('button, a, [data-slot]'); if (!t) return;
+    if (t.dataset.fast != null) {
+      ui.fast = !ui.fast;
+      try { localStorage.setItem(FAST_KEY, ui.fast ? '1' : '0'); } catch { /* stockage indisponible */ }
+      return renderConsole(ui);
+    }
+    if (t.dataset.again != null || ui.busy) return;
     // Mise en place
     if (g.pending?.type === 'setup') {
       if (t.dataset.hand != null) {
         const uid = +t.dataset.hand;
         if (!isBasic(card(g, uid))) return;
         ui.setupPick = ui.setupPick.includes(uid) ? ui.setupPick.filter(x => x !== uid) : [...ui.setupPick, uid].slice(0, 6);
-        return render(ui);
+        return renderConsole(ui);
       }
-      if (t.dataset.setupOk != null) { setup(g, [ui.setupPick, chooseSetup(g, 1)]); ui.setupPick = []; return render(ui); }
+      if (t.dataset.setupOk != null && ui.setupPick.length) doSetup(ui);
       return;
     }
-    // Remplacement après un KO
+    // Remplacement après un K.O.
     if (g.pending?.type === 'promote' && g.pending.players.includes(0)) {
-      if (t.dataset.slot) { const [, zone, i] = t.dataset.slot.split('|'); if (zone === 'bench') { promote(g, 0, +i); render(ui); } }
+      if (t.dataset.slot) { const [, zone, i] = t.dataset.slot.split('|'); if (zone === 'bench') perform(ui, () => promote(g, 0, +i)); }
       return;
     }
     if (g.current !== 0 || g.winner != null) return;
+    if (t.dataset.go) { ui.view = t.dataset.go; return renderConsole(ui); }
     if (t.dataset.cancel != null) { ui.sel = null; ui.mode = null; return render(ui); }
-    if (t.dataset.end != null) { ui.sel = null; ui.mode = null; apply(g, { type: 'end' }); return render(ui); }
-    if (t.dataset.attack != null) { ui.sel = null; apply(g, { type: 'attack', i: +t.dataset.attack }); return render(ui); }
-    if (t.dataset.retreat != null) { ui.sel = null; ui.mode = 'retreat'; return render(ui); }
-    const actions = legalActions(g);
+    if (t.dataset.end != null) return perform(ui, () => apply(g, { type: 'end' }));
+    if (t.dataset.attack != null) return perform(ui, () => apply(g, { type: 'attack', i: +t.dataset.attack }));
+    if (t.dataset.retreat != null) { ui.mode = 'retreat'; return render(ui); }
     if (t.dataset.hand != null) {
       const uid = +t.dataset.hand;
       const name = card(g, uid).name;
       // legalActions ne garde qu'une copie par carte : on retrouve les actions par nom.
-      const mine = actions.filter(a => a.uid != null && card(g, a.uid).name === name).map(a => ({ ...a, uid }));
+      const mine = legalActions(g).filter(a => a.uid != null && card(g, a.uid).name === name).map(a => ({ ...a, uid }));
       if (!mine.length) return;
-      if (mine.length === 1 && !mine[0].zone && !(mine[0].target && mine[0].target.zone)) { apply(g, mine[0]); ui.sel = null; return render(ui); }
+      if (mine.length === 1 && !mine[0].zone && !mine[0].target?.zone) return perform(ui, () => apply(g, mine[0]), { action: mine[0] });
       ui.sel = uid; ui.selActions = mine;
       return render(ui);
     }
     if (t.dataset.slot) {
       const [side, zone, i] = t.dataset.slot.split('|');
-      if (ui.mode === 'retreat' && side === '0' && zone === 'bench') { ui.mode = null; apply(g, { type: 'retreat', i: +i }); return render(ui); }
+      if (ui.mode === 'retreat' && side === '0' && zone === 'bench') return perform(ui, () => apply(g, { type: 'retreat', i: +i }));
       if (ui.sel != null) {
-        const a = (ui.selActions ?? []).find(x => (x.zone === zone && (zone === 'active' || x.i === +i) && side === '0')
-          || (x.target && String(x.target.side) === side && x.target.zone === zone && (zone === 'active' || x.target.i === +i)));
-        if (a) { apply(g, { ...a, uid: ui.sel }); ui.sel = null; return render(ui); }
+        const same = (z, idx) => z === zone && (zone === 'active' || idx === +i);
+        const a = (ui.selActions ?? []).find(x => (side === '0' && x.zone && same(x.zone, x.i))
+          || (x.target && String(x.target.side) === side && same(x.target.zone, x.target.i)));
+        if (a) { const act = { ...a, uid: ui.sel }; return perform(ui, () => apply(g, act), { action: act }); }
       }
     }
-  };
+  });
 }
-
-async function aiTurn(ui) {
-  const g = ui.g;
-  ui.busy = true;
-  await sleep(700);
-  for (let guard = 0; guard < 60 && g.current === 1 && g.winner == null; guard++) {
-    if (g.pending) {
-      if (g.pending.type === 'promote' && g.pending.players[0] === 1) promote(g, 1, bestPromotion(g, 1));
-      else break; // c'est au joueur de choisir (son Actif a été mis K.O.)
-      render(ui); await sleep(500); continue;
-    }
-    const action = chooseAction(g, 1, ui.level);
-    apply(g, action);
-    render(ui);
-    await sleep(action.type === 'attack' ? 1100 : 650);
-  }
-  ui.busy = false;
-  render(ui);
-}
-
