@@ -335,7 +335,7 @@ function renderConsole(ui) {
         <button class="cbtn back" data-go="main">← Retour</button></div>`;
   } else if (view === 'end') {
     body = `
-      <div class="cprompt">${g.winner === 0 ? '🏆 Victoire !' : 'Défaite…'} <small>${esc(g.reason)}</small></div>
+      <div class="cprompt">${g.winner === 0 ? '🏆 Victoire !' : 'Défaite…'} <small>${esc(tutoie(g.reason))}</small></div>
       <div class="crow"><a class="cbtn fight" href="#/combat" data-again>⚔ Rejouer</a><a class="cbtn back" href="#/decks/jeu/pokemon">Mes decks</a></div>`;
   } else {
     const playable = new Set(legalActions(g).filter(a => a.uid != null).map(a => card(g, a.uid).name));
@@ -410,16 +410,28 @@ function showEnd(ui) {
   recordBattle(`pokemon/${ui.level}`, won);
   bgm.stop();
   ui.arena.querySelector('.overlay').innerHTML = `
-    <div class="bover ${won ? 'win' : 'lose'}"><h2>${won ? '🏆 Victoire !' : 'Défaite…'}</h2><p>${esc(ui.g.reason)}</p></div>`;
+    <div class="bover ${won ? 'win' : 'lose'}"><h2>${won ? '🏆 Victoire !' : 'Défaite…'}</h2><p>${esc(tutoie(ui.g.reason))}</p></div>`;
   setTimeout(() => { if (won) { sfx.win(); fx.confettiRain(); fx.flash('#ffd36b', 0.4, 800); } else sfx.lose(); }, 300);
 }
 
 // ---------- Messages et animations ----------
 
+// Le journal du moteur parle de « Toi » à la 3ᵉ personne : on tutoie le joueur dans la boîte de messages.
+const TU = { place: 'places', attache: 'attaches', joue: 'joues', envoie: 'envoies', pioche: 'pioches', prend: 'prends', fait: 'fais',
+  ajoute: 'ajoutes', récupère: 'récupères', gagne: 'gagnes', commence: 'commences' };
+function tutoie(text) {
+  return text
+    .replace(/: Toi commence/, ': tu commences')
+    .replace(/\bToi (place|attache|joue|envoie|pioche|prend|fait|ajoute|récupère|gagne|commence)\b/g, (_, v) => `Tu ${TU[v]}`)
+    .replace(/Toi ne peut plus piocher/, 'Tu ne peux plus piocher')
+    .replace(/Toi n'a plus de Pokémon/, 'Tu n\'as plus de Pokémon')
+    .replace(/^(Tu .*?)\bson Banc\b/, '$1ton Banc').replace(/^(Tu .*?)\bsa (main|défausse)\b/, '$1ta $2');
+}
+
 async function say(ui, text) {
   const box = ui.root?.querySelector('.msgbox p');
   if (!box) return;
-  text = text.replace(/^💥 /, '');
+  text = tutoie(text.replace(/^💥 /, ''));
   ui.skip = false;
   box.parentElement.classList.remove('done');
   for (let i = 1; i <= text.length && !ui.skip && alive(ui); i += 2) {

@@ -110,6 +110,10 @@ Dans la fenêtre d'une carte (partout sur le site) : **☆ Ajouter aux favoris**
 ## Combat Pokémon contre l'IA
 
 Page **Combat** : un deck Pokémon (de ta collection, ou un deck de démo) contre l'IA, en 3 niveaux.
+Mise en scène inspirée des jeux 3DS (Rubis Oméga / Saphir Alpha) avec les vraies règles du JCC : terrain en 3D (décor selon le type du deck adverse),
+cartes Actives debout sur leurs plateformes, boîtes de PV vert / jaune / rouge, Banc et Récompenses, messages qui s'écrivent,
+menu Attaque / Sac / Pokémon / Fin du tour, caméra, projectiles et impacts selon le type, K.O., musique de combat. Bouton « ⏩ » pour accélérer.
+- Affichage et enchaînement des animations : [public/js/battle/battle.js](public/js/battle/battle.js) (`perform` → `playback`).
 - Règles : [public/js/battle/engine.js](public/js/battle/engine.js) (Actif / Banc, Énergies, évolutions, Dresseurs, retraite, faiblesse / résistance, états spéciaux, Récompenses).
 - Effets des cartes lus dans le texte français : [public/js/battle/effects.js](public/js/battle/effects.js). Seuls les plus courants sont simulés.
 - IA : [public/js/battle/ai.js](public/js/battle/ai.js). Facile = au hasard, Normal = meilleur coup testé sur une copie de la partie (avec erreurs), Difficile = sans erreur et en anticipant l'attaque adverse.
