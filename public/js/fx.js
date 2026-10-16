@@ -92,7 +92,8 @@ function loop(now) {
     p.life -= k;
     if (p.life <= 0) { parts.splice(i, 1); continue; }
     if (p.target) { // aspiration vers un point (charge d'une carte rare)
-      p.x += (p.target.x - p.x) * 0.06 * k; p.y += (p.target.y - p.y) * 0.06 * k;
+      const pull = Math.min(1, (p.pull ?? 0.06) * k);
+      p.x += (p.target.x - p.x) * pull; p.y += (p.target.y - p.y) * pull;
     } else {
       p.vx *= p.drag ** k; p.vy = p.vy * p.drag ** k + p.gravity * k;
       p.x += p.vx * k; p.y += p.vy * k;
@@ -154,6 +155,17 @@ export function converge(x, y, { colors = ['#fff'], ms = 1000, rate = 4 } = {}) 
     if (performance.now() < end) requestAnimationFrame(tick);
   };
   tick();
+}
+
+/** Particules qui voyagent d'un point à un autre (projectile d'une attaque). */
+export function travel(from, to, { colors = ['#fff'], n = 40, ms = 450, size = 3, shapes = ['dot', 'star'] } = {}) {
+  if (reduced) n = Math.min(n, 8);
+  for (let i = 0; i < n; i++) {
+    setTimeout(() => spawn({
+      x: from.x + rnd(-20, 20), y: from.y + rnd(-20, 20), vx: 0, vy: 0, life: 34, color: pick(colors), size: rnd(0.6, 1.4) * size,
+      shape: pick(shapes), pull: 0.13, target: { x: to.x + rnd(-14, 14), y: to.y + rnd(-14, 14) },
+    }), (i / n) * ms);
+  }
 }
 
 /** Pluie de confettis sur toute la largeur de l'écran. */

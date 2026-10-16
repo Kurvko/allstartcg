@@ -44,15 +44,15 @@ function envelope(g, t, vol, a, d) {
   g.gain.exponentialRampToValueAtTime(0.0001, t + a + d);
 }
 
-function send(node, rev, pan) {
+function send(node, rev, pan, bus = out) {
   let n = node;
   if (pan && ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = pan; n.connect(p); n = p; }
-  n.connect(out);
+  n.connect(bus);
   if (rev) { const s = ctx.createGain(); s.gain.value = rev; n.connect(s); s.connect(wet); }
 }
 
 /** Note : oscillateur + enveloppe, glissando (f2) et filtre passe-bas (lp → lp2) facultatifs. */
-function tone({ f = 440, f2, type = 'sine', at = 0, a = 0.005, d = 0.2, vol = 0.2, rev = 0, pan = 0, detune = 0, lp, lp2 } = {}) {
+function tone({ f = 440, f2, type = 'sine', at = 0, a = 0.005, d = 0.2, vol = 0.2, rev = 0, pan = 0, detune = 0, lp, lp2, bus } = {}) {
   const c = audio(); if (!c) return;
   const t = c.currentTime + at;
   const o = c.createOscillator(), g = c.createGain();
@@ -66,12 +66,12 @@ function tone({ f = 440, f2, type = 'sine', at = 0, a = 0.005, d = 0.2, vol = 0.
     if (lp2) fl.frequency.exponentialRampToValueAtTime(lp2, t + a + d * 0.6);
     o.connect(fl); src = fl;
   }
-  src.connect(g); send(g, rev, pan);
+  src.connect(g); send(g, rev, pan, bus);
   o.start(t); o.stop(t + a + d + 0.05);
 }
 
 /** Bruit filtré : déchirures, souffles, impacts. */
-function noise({ at = 0, a = 0.005, d = 0.2, vol = 0.2, type = 'bandpass', f = 1000, f2, q = 1, rev = 0, pan = 0 } = {}) {
+function noise({ at = 0, a = 0.005, d = 0.2, vol = 0.2, type = 'bandpass', f = 1000, f2, q = 1, rev = 0, pan = 0, bus } = {}) {
   const c = audio(); if (!c) return;
   const t = c.currentTime + at;
   const src = c.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
@@ -79,7 +79,7 @@ function noise({ at = 0, a = 0.005, d = 0.2, vol = 0.2, type = 'bandpass', f = 1
   fl.frequency.setValueAtTime(f, t);
   if (f2) fl.frequency.exponentialRampToValueAtTime(f2, t + a + d);
   const g = c.createGain(); envelope(g, t, vol, a, d);
-  src.connect(fl).connect(g); send(g, rev, pan);
+  src.connect(fl).connect(g); send(g, rev, pan, bus);
   src.start(t, Math.random() * 1.5); src.stop(t + a + d + 0.05);
 }
 
@@ -196,6 +196,88 @@ export const sfx = {
     sparkle(0.4, 16);
   },
   lose() { arp([67, 63, 60, 55], 0.22, { type: 'triangle', d: 0.45, vol: 0.06, rev: 0.4 }); },
+  /** Une carte entre sur le terrain (façon Poké Ball qui s'ouvre). */
+  sendOut() {
+    tone({ f: 900, f2: 300, type: 'triangle', d: 0.12, vol: 0.06 });
+    noise({ type: 'bandpass', f: 1200, f2: 6000, q: 1, at: 0.1, a: 0.02, d: 0.35, vol: 0.18 });
+    arp([84, 91, 96], 0.05, { at: 0.12, type: 'sine', d: 0.3, vol: 0.04, rev: 0.6 });
+  },
+  evolve() {
+    for (let i = 0; i < 10; i++) tone({ f: midi(60 + i * 3), at: i * 0.07, type: 'triangle', d: 0.18, vol: 0.04, rev: 0.5 });
+    chord([72, 76, 79, 84], { at: 0.75, type: 'sine', a: 0.05, d: 1.4, vol: 0.04, rev: 0.8 });
+    sparkle(0.75, 10);
+  },
+  faint() {
+    tone({ f: 600, f2: 70, type: 'square', d: 0.9, vol: 0.05, lp: 1600, lp2: 300 });
+    noise({ type: 'lowpass', f: 1500, f2: 100, a: 0.2, d: 0.7, vol: 0.18 });
+  },
+  /** Bips quand la barre de PV passe au rouge. */
+  lowHp() { for (let i = 0; i < 4; i++) tone({ f: 1760, type: 'square', at: i * 0.16, d: 0.07, vol: 0.025, lp: 4000 }); },
+  turn() { arp([79, 84], 0.09, { type: 'triangle', d: 0.25, vol: 0.05, rev: 0.4 }); },
+  energy(type) {
+    const base = { Feu: 62, Eau: 74, Plante: 67, Électrique: 86, Psy: 79, Combat: 55, Obscurité: 58, Métal: 81, Dragon: 64 }[type] ?? 72;
+    arp([base + 12, base + 19, base + 24], 0.05, { type: 'sine', d: 0.25, vol: 0.05, rev: 0.5 });
+  },
+  /** Bruit d'attaque selon le type (avant l'impact). */
+  attack(type) {
+    switch (type) {
+      case 'Feu': noise({ type: 'lowpass', f: 600, f2: 3000, a: 0.15, d: 0.5, vol: 0.3 }); break;
+      case 'Eau': for (let i = 0; i < 8; i++) tone({ f: rnd(500, 1400), f2: rnd(1500, 2600), at: i * 0.05, d: 0.06, vol: 0.05 }); break;
+      case 'Électrique': for (let i = 0; i < 6; i++) noise({ type: 'highpass', f: 3000, at: i * 0.06, d: 0.04, vol: 0.2 }); tone({ type: 'sawtooth', f: 80, f2: 160, d: 0.4, vol: 0.06, lp: 2000 }); break;
+      case 'Psy': tone({ type: 'sine', f: 300, f2: 1200, a: 0.3, d: 0.3, vol: 0.08, rev: 0.6 }); tone({ type: 'sine', f: 310, f2: 1250, a: 0.3, d: 0.3, vol: 0.06 }); break;
+      case 'Plante': noise({ type: 'bandpass', f: 2500, f2: 800, q: 3, d: 0.4, vol: 0.2 }); break;
+      default: noise({ type: 'bandpass', f: 400, f2: 3000, q: 1.2, a: 0.1, d: 0.25, vol: 0.22 });
+    }
+  },
+};
+
+// ---------- Musique de combat (composition originale, jouée en direct) ----------
+// La mineur, 150 BPM, 4 mesures en boucle : basse, arpèges, batterie.
+const STEP = 60 / 150 / 4;
+const CHORDS = [[57, 60, 64], [53, 57, 60], [55, 59, 62], [52, 56, 59]]; // Am, F, G, E
+const LEAD = [0, 1, 2, 1, 2, 3, 2, 1];
+let music = null;
+
+function musicStep(step, t) {
+  const c = ctx, bar = Math.floor(step / 16) % 4, s16 = step % 16, chord = CHORDS[bar];
+  const at = t - c.currentTime, bus = music.bus;
+  // Batterie
+  if (s16 % 8 === 0) tone({ f: 130, f2: 42, at, d: 0.16, vol: 0.5, bus });
+  if (s16 % 8 === 4) noise({ type: 'bandpass', f: 1800, q: 0.8, at, d: 0.12, vol: 0.22, bus });
+  if (s16 % 2 === 0) noise({ type: 'highpass', f: 7000, at, d: 0.03, vol: s16 % 4 ? 0.05 : 0.08, bus });
+  // Basse : croches avec saut d'octave
+  if (s16 % 2 === 0) tone({ f: midi(chord[0] - 24 + (s16 % 4 ? 12 : 0)), type: 'triangle', at, d: STEP * 1.8, vol: 0.2, bus });
+  // Arpèges
+  const k = LEAD[s16 % 8], note = chord[k % 3] + 12 + (k >= 3 ? 12 : 0) + (s16 >= 8 && bar % 2 ? 12 : 0);
+  tone({ f: midi(note), type: 'square', at, d: STEP * 0.9, vol: 0.022, lp: 2600, bus });
+  // Mélodie longue sur les temps forts
+  if (s16 === 0) tone({ f: midi(chord[2] + 24), type: 'sawtooth', at, a: 0.02, d: STEP * 7, vol: 0.02, lp: 1800, bus });
+  if (s16 === 8) tone({ f: midi(chord[1] + 24), type: 'sawtooth', at, a: 0.02, d: STEP * 7, vol: 0.02, lp: 1800, bus });
+}
+
+export const bgm = {
+  start() {
+    if (music) return;
+    const c = audio(); if (!c) return;
+    const bus = c.createGain(); bus.gain.value = 0.45; bus.connect(out);
+    music = { bus, step: 0, next: c.currentTime + 0.15 };
+    music.timer = setInterval(() => {
+      if (!on || !music) return;
+      while (music.next < ctx.currentTime + 0.3) {
+        musicStep(music.step, music.next);
+        music.next += STEP;
+        music.step = (music.step + 1) % 64;
+      }
+    }, 60);
+  },
+  stop() {
+    if (!music) return;
+    clearInterval(music.timer);
+    const { bus } = music;
+    bus.gain.setTargetAtTime(0, ctx.currentTime, 0.2);
+    setTimeout(() => bus.disconnect(), 1200);
+    music = null;
+  },
 };
 
 /** Bouton 🔊 / 🔇 de la barre du haut. */
