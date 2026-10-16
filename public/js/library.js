@@ -2,7 +2,7 @@
 import { GAMES, findSet } from './catalog.js';
 import { loadIndex } from './data.js';
 import { getState } from './store.js';
-import { app, esc, fmt, versioned } from './ui.js';
+import { app, esc, fmt, versioned, cardArt } from './ui.js';
 
 const PAGE = 120;
 const cache = new Map();
@@ -36,14 +36,14 @@ async function loadCards(gameId) {
 
 // Objet carte attendu par la fenêtre de détail.
 const asCard = c => ({
-  id: c.i, name: c.n, num: c.u, rarity: c.r, price: c.p, tier: c.tier, img: c.m,
+  id: c.i, name: c.n, num: c.u, rarity: c.r, price: c.p, tier: c.tier, img: c.m, sport: c.x,
   imgHi: c.m.replace('/low.webp', '/high.webp').replace('_400w', '_in_1000x1000').replace('image_url_small', 'image_url'),
 });
 
 function thumb(c) {
   return `
     <button class="thumb tier-${c.tier} ${c.owned ? '' : 'missing'}" data-key="${esc(c.setKey)}|${esc(c.i)}">
-      <img src="${c.m}" alt="${esc(c.n)}" loading="lazy">
+      ${cardArt(asCard(c))}
       ${c.owned > 1 ? `<span class="count">×${c.owned}</span>` : ''}
       <span class="thumb-info"><span>${esc(c.n)}</span><b>${fmt(c.p)}</b></span>
     </button>`;

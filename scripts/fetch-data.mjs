@@ -196,6 +196,7 @@ const exists = file => access(file).then(() => true, () => false);
 let failed = 0;
 for (const { game, set, key } of allSets()) {
   if (only && game.id !== only && key !== only) continue;
+  if (!SOURCES[set.source]) continue; // cartes sport : npm run sports
   if (missingOnly && await exists(fileOf(game, set))) continue;
   process.stdout.write(`${key.padEnd(22)} `);
   try {
@@ -221,6 +222,12 @@ const index = {};
 for (const { game, set, key } of allSets()) {
   try {
     const { cards } = JSON.parse(await readFile(fileOf(game, set), 'utf8'));
+    if (game.sport) {
+      // Cartes sport sans prix : carte phare = un Noir 1/1 d'une star avec photo.
+      const star = cards.find(c => c.rarity === 'Noir 1/1' && c.img && set.stars?.includes(c.name)) ?? cards.find(c => c.rarity === 'Noir 1/1' && c.img) ?? cards[0];
+      index[key] = { total: cards.length, chase: { name: star.name, img: star.img, price: null } };
+      continue;
+    }
     // Carte phare = illustration du booster : la plus chère dont l'image existe vraiment.
     const top = [...cards].sort((a, b) => (b.price ?? 0) - (a.price ?? 0)).slice(0, 6);
     let chase = top[0];

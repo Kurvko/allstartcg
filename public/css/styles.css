@@ -644,3 +644,69 @@ a.deck-tile:hover { border-color: var(--c); transform: translateY(-2px); }
     linear-gradient(#fff, #fff) center / 4px 100% no-repeat,
     #012169;
 }
+
+/* ---------- Cartes sport dessinées (ui.js → cardArt) ---------- */
+span.sc {
+  position: relative; display: block; width: 100%; height: 100%; aspect-ratio: 63 / 88; overflow: hidden;
+  border-radius: inherit; container-type: inline-size; background: #111; color: #fff; text-align: left;
+  font-family: Inter, system-ui, sans-serif; --frame: linear-gradient(160deg, #fdfdfd, #d9dce3);
+}
+span.sc > .sc-bg {
+  position: absolute; inset: 0;
+  background:
+    repeating-linear-gradient(115deg, transparent 0 7cqw, #ffffff0d 7cqw 14cqw),
+    radial-gradient(120% 75% at 50% 28%, color-mix(in srgb, var(--t1) 70%, #fff 30%), var(--t1) 55%, color-mix(in srgb, var(--t1) 55%, #000) 100%);
+}
+span.sc > img.sc-wm {
+  position: absolute; left: 10%; top: 10%; width: 80%; height: 55%; object-fit: contain;
+  opacity: .16; filter: grayscale(1) brightness(3);
+}
+span.sc > img.sc-photo {
+  position: absolute; left: 0; bottom: 21%; width: 100%; height: 70%; object-fit: cover; object-position: 50% 18%;
+  filter: drop-shadow(0 2cqw 3cqw #0007);
+}
+span.sc > .sc-none {
+  position: absolute; left: 20%; bottom: 21%; width: 60%; height: 58%; opacity: .35;
+  background: radial-gradient(circle at 50% 28%, #fff 0 17%, transparent 17.5%), radial-gradient(ellipse 50% 42% at 50% 100%, #fff 0 99%, transparent 100%);
+}
+span.sc > .sc-top { position: absolute; top: 5cqw; right: 6cqw; display: flex; flex-direction: column-reverse; align-items: center; gap: 1.5cqw; z-index: 2; }
+span.sc > .sc-top b { font: 800 12cqw/1 var(--display); text-shadow: 0 1cqw 3cqw #000a; }
+span.sc > .sc-top img { width: 16cqw; height: 16cqw; object-fit: contain; filter: drop-shadow(0 1cqw 2cqw #0008); }
+span.sc > .sc-foot {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 23%; padding: 2cqw 7cqw 4cqw; z-index: 2;
+  display: grid; align-content: center; gap: 1.2cqw;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--t1) 65%, #000), #05060a);
+  border-top: 1.2cqw solid var(--t2);
+}
+span.sc > .sc-foot b { font: 800 8.4cqw/1.05 var(--display); text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+span.sc > .sc-foot small { font-size: 5cqw; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+span.sc > .sc-rc, span.sc > .sc-serial {
+  position: absolute; bottom: 25%; z-index: 2; font: 800 5.6cqw/1 var(--display); padding: 1.2cqw 2.4cqw; border-radius: 1.4cqw;
+}
+span.sc > .sc-rc { right: 6cqw; background: #e5484d; box-shadow: 0 1cqw 3cqw #0007; }
+span.sc > .sc-serial { left: 6cqw; background: #000c; color: #ffd36b; border: .5cqw solid currentColor; }
+/* Cadre : bordure intérieure aux couleurs de la rareté */
+span.sc::after {
+  content: ''; position: absolute; inset: 0; z-index: 3; pointer-events: none; border-radius: inherit;
+  padding: 3.2cqw; background: var(--frame);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+span.sc-young { --frame: linear-gradient(160deg, #fff, #ffd5d6, #fff); }
+span.sc-silver { --frame: linear-gradient(135deg, #f5f7fa, #8d97a8, #ffffff, #aab3c2, #e9edf3); }
+span.sc-blue { --frame: linear-gradient(135deg, #7fb2ff, #1252d6, #9ec5ff, #0b3aa8); }
+span.sc-gold { --frame: linear-gradient(135deg, #fff1a8, #c8971e, #ffe58a, #8f6a10, #ffd75e); }
+span.sc-black { --frame: linear-gradient(135deg, #2b2b2b, #000, #4a4a4a, #000); }
+span.sc-black > .sc-bg { filter: brightness(.3) saturate(.5); }
+span.sc-black > .sc-foot { background: #000; border-top-color: #ffd36b; }
+span.sc-black > .sc-foot b { color: #ffd36b; }
+/* Effet « prizm » sur les parallèles */
+span.sc-silver > .sc-bg::after, span.sc-blue > .sc-bg::after, span.sc-gold > .sc-bg::after, span.sc-black > .sc-bg::after {
+  content: ''; position: absolute; inset: 0; mix-blend-mode: color-dodge; opacity: .55;
+  background: conic-gradient(from 30deg at 50% 40%, #ff6b6b33, #ffd93d44, #6bff9a33, #4dabff44, #c56bff33, #ff6b6b33);
+}
+span.sc-blue > .sc-bg::after { background: conic-gradient(from 0deg at 50% 40%, #3e8bff66, #9ec5ff33, #3e8bff66); }
+span.sc-gold > .sc-bg::after { background: conic-gradient(from 0deg at 50% 40%, #ffd75e77, #fff1a833, #c8971e66, #ffd75e77); }
+/* Carte sport pas encore possédée : toute la carte grisée, pas seulement la photo */
+.thumb.missing span.sc { filter: grayscale(1) brightness(.45); opacity: .3; }
+.thumb.missing span.sc img { filter: none; opacity: 1; }

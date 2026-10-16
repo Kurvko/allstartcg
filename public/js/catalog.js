@@ -150,6 +150,19 @@ const RIFT_SLOTS = [
   [['Common', 57], ['Uncommon', 28], ['Rare', 3.7], ['Epic', 1.5], ['Showcase', 9.7], ['Signature', 0.14]],
 ];
 
+// ---------- Cartes sport ----------
+// Parallèles comme chez Panini / Topps : Argent ≈ 1 booster sur 3, numérotées /199, /10, 1/1 de plus en plus rares.
+function sportTiers(young) {
+  return { Base: 0, [young]: 1, Argent: 2, 'Bleu /199': 3, 'Or /10': 4, 'Noir 1/1': 5 };
+}
+function sportSlots(young) {
+  return [
+    ...rep(6, [['Base', 88], [young, 12]]),
+    [['Base', 62], [young, 8], ['Argent', 30]],
+    [['Argent', 80], ['Bleu /199', 16], ['Or /10', 3.6], ['Noir 1/1', 0.4]],
+  ];
+}
+
 export const GAMES = [
   {
     id: 'pokemon',
@@ -301,10 +314,29 @@ export const GAMES = [
       { id: 'VEN', packPrice: 7, name: 'Vendetta', year: 2026, source: 'tcgcsv', category: 89, tcgGroup: 24698, tiers: RIFT_TIERS, slots: RIFT_SLOTS, variants: RIFT_VARIANTS },
     ],
   },
+  // ---------- Cartes sport (pas des TCG, mais des cartes à collectionner) ----------
+  // Cartes dessinées par le site à partir des effectifs ESPN (npm run sports), sans prix.
+  // Booster de 8 cartes façon « retail » : 6 bases, 1 base ou Argent, 1 parallèle garanti.
+  {
+    id: 'basketball', name: 'Basket', short: 'Basket NBA', color: '#f58426', accent: '#1d428a', sport: true,
+    sets: [
+      { id: 'nba-2026-27', packPrice: 5, name: 'NBA 2026-27', year: 2026, source: 'espn', league: 'basketball/nba', youngLabel: 'Rookie', tiers: sportTiers('Rookie'), slots: sportSlots('Rookie'),
+        stars: ['Victor Wembanyama', 'Luka Doncic', 'Stephen Curry', 'LeBron James', 'Nikola Jokic', 'Shai Gilgeous-Alexander'] },
+    ],
+  },
+  {
+    id: 'soccer', name: 'Football', color: '#2bb673', accent: '#0d3b66', sport: true,
+    sets: [
+      { id: 'ligue1-2026-27', packPrice: 5, name: 'Ligue 1 2026-27', year: 2026, source: 'espn', league: 'soccer/fra.1', wikiLangs: ['fr', 'en'], youngLabel: 'Espoir', tiers: sportTiers('Espoir'), slots: sportSlots('Espoir'),
+        stars: ['Ousmane Dembélé', 'Désiré Doué', 'Khvicha Kvaratskhelia', 'Bradley Barcola'] },
+      { id: 'premier-league-2026-27', packPrice: 5, name: 'Premier League 2026-27', year: 2026, source: 'espn', league: 'soccer/eng.1', wikiLangs: ['en', 'fr'], youngLabel: 'Espoir', tiers: sportTiers('Espoir'), slots: sportSlots('Espoir'),
+        stars: ['Erling Haaland', 'Mohamed Salah', 'Bukayo Saka', 'Cole Palmer'] },
+    ],
+  },
 ];
 
 // Ordre d'affichage des jeux partout sur le site.
-const GAME_ORDER = ['pokemon', 'onepiece', 'dragonball', 'yugioh', 'riftbound', 'lorcana', 'magic'];
+const GAME_ORDER = ['pokemon', 'onepiece', 'dragonball', 'yugioh', 'riftbound', 'lorcana', 'magic', 'soccer', 'basketball'];
 GAMES.sort((a, b) => GAME_ORDER.indexOf(a.id) - GAME_ORDER.indexOf(b.id));
 
 // Dos officiel des cartes de chaque jeu (public/backs/<jeu>.webp).

@@ -15,8 +15,9 @@ for (const game of GAMES) {
     try { ({ cards } = JSON.parse(await readFile(join(ROOT, 'public', 'data', game.id, `${set.id}.json`), 'utf8'))); } catch { continue; }
     for (const c of cards) {
       // s = set, i = id, n = nom, u = numéro, r = rareté, m = image, p = prix, d = n° Pokédex, k = type de carte
-      const row = { s: set.id, i: c.id, n: c.name, u: c.num, r: c.rarity, m: c.img, p: c.price ?? 0, k: c.play?.kind };
+      const row = { s: set.id, i: c.id, n: c.name, u: c.num, r: c.rarity, m: c.img, p: c.price ?? (c.sport ? null : 0), k: c.play?.kind };
       if (c.play?.dex?.length) row.d = c.play.dex;
+      if (c.sport) row.x = c.sport;
       rows.push(row);
     }
   }

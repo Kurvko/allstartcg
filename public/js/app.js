@@ -1,7 +1,7 @@
 import { GAMES, DAILY_PACKS, findSet } from './catalog.js';
 import { loadPacks, loadSet, openPack, collectionSummary } from './data.js';
 import { getState, packsLeft, owned, recordPack, recordValue, resetAll } from './store.js';
-import { app, esc, fmt } from './ui.js';
+import { app, esc, fmt, cardArt } from './ui.js';
 import { initCloud } from './cloud.js';
 import { viewAccount, accountBadge } from './account.js';
 import { viewDecks } from './decks.js';
@@ -29,7 +29,12 @@ function preload(urls, timeout = 5000) {
   ]);
 }
 
-const chaseCard = data => data.cards.reduce((a, b) => ((b.price ?? 0) > (a.price ?? 0) ? b : a));
+// Cartes sport (sans prix) : on compare la rareté, puis les stars du set.
+const cardScore = (c, set) => c.price ?? (c.tier * 10 + (set?.stars?.includes(c.name) ? 5 : 0) + (c.img ? 1 : 0)) / 1000;
+const bestOf = (cards, set) => cards.reduce((a, b) => (cardScore(b, set) > cardScore(a, set) ? b : a));
+const chaseCard = (data, set) => bestOf(data.cards, set);
+// Prix affiché seulement s'il existe (pas de prix pour les cartes sport).
+const priceTag = p => (p == null ? '' : fmt(p));
 
 async function refreshTotal() {
   const { value } = await collectionSummary();
@@ -71,20 +76,20 @@ function dots(gameId) {
 function cardThumb(card, count, { missing = false } = {}) {
   return `
     <button class="thumb tier-${card.tier} ${missing ? 'missing' : ''}" data-card="${esc(card.id)}">
-      <img src="${card.img}" alt="${esc(card.name)}" loading="lazy">
+      ${cardArt(card)}
       ${count > 1 ? `<span class="count">×${count}</span>` : ''}
-      <span class="thumb-info"><span>${esc(card.name)}</span><b>${fmt(card.price)}</b></span>
+      <span class="thumb-info"><span>${esc(card.name)}</span><b>${card.sport ? esc(RARITY_LABEL(card.rarity)) : fmt(card.price)}</b></span>
     </button>`;
 }
 
 function openModal(card, game, count) {
   modal.innerHTML = `
     <div class="modal-inner" style="--c:${game.color}">
-      <div class="tilt tier-${card.tier}"><img src="${card.imgHi}" alt="${esc(card.name)}"><div class="shine"></div></div>
+      <div class="tilt tier-${card.tier}">${cardArt(card, { hi: true, lazy: false })}<div class="shine"></div></div>
       <div class="modal-info">
         <h2>${esc(card.name)}</h2>
-        <p class="muted">${esc(RARITY_LABEL(card.rarity))} · n° ${esc(card.num)}</p>
-        <p class="modal-price">${fmt(card.price)}</p>
+        <p class="muted">${esc(RARITY_LABEL(card.rarity))}${card.num ? ` · n° ${esc(card.num)}` : ''}</p>
+        ${card.price == null ? `<p class="muted">${esc(card.sport?.team ?? '')}${card.sport?.pos ? ` · ${esc(card.sport.pos)}` : ''}</p>` : `<p class="modal-price">${fmt(card.price)}</p>`}
         <p class="muted">${count ? `Tu en possèdes ${count}` : 'Pas encore dans ta collection'}</p>
         <button class="btn ghost" data-close>Fermer</button>
       </div>
@@ -197,7 +202,7 @@ function setTile(game, set, row) {
       ${packHtml(game, set, row.meta.chase.img, { img: PACKS[row.key]?.[0] })}
       <h3 class="set-name">${esc(set.name)}</h3>
       <div class="progress"><i style="width:${pct}%"></i></div>
-      <div class="set-tile-info"><span>${row.unique}/${row.total} cartes</span><b>${fmt(row.value)}</b></div>
+      <div class="set-tile-info"><span>${row.unique}/${row.total} cartes</span>${game.sport ? "" : `<b>${fmt(row.value)}</b>`}</div>
     </a>`;
 }
 
@@ -250,13 +255,13 @@ async function viewOpen(setKey) {
   if (!found) return viewNotFound();
   const { game, set } = found;
   const data = await loadSet(setKey);
-  const chase = chaseCard(data);
+  const chase = chaseCard(data, set);
 
   app.innerHTML = `
     <section class="open" style="--c:${game.color};--a:${game.accent}">
       <div class="open-head">
         <a href="#/game/${game.id}" class="back">← ${esc(game.short ?? game.name)}</a>
-        <div><h1>${esc(set.name)}</h1><p class="muted">${esc(game.name)} · ${set.year} · ${data.cards.length} cartes · carte phare : ${esc(chase.name)} (${fmt(chase.price)})</p></div>
+        <div><h1>${esc(set.name)}</h1><p class="muted">${esc(game.name)} · ${set.year} · ${data.cards.length} cartes · carte phare : ${esc(chase.name)}${chase.price == null ? ` (${esc(RARITY_LABEL(chase.rarity))})` : ` (${fmt(chase.price)})`}</p></div>
         <div class="open-quota"></div>
       </div>
       <div class="stage"></div>
@@ -374,7 +379,7 @@ async function viewOpen(setKey) {
     pack.style.setProperty('--rx', '0deg');
     cut.style.transition = 'width .35s ease-out';
     cut.style.width = '100%';
-    const loading = preload(cards.map(c => c.img));
+    const loading = preload(cards.map(c => c.img).filter(Boolean));
     await sleep(380);
     scene.classList.add('torn');                // la languette s'arrache
     await Promise.all([loading, sleep(650)]);
@@ -393,7 +398,7 @@ async function viewOpen(setKey) {
         <div class="scard tier-${c.tier}" style="--i:${i};--n:${cards.length}" data-i="${i}">
           <div class="scard-inner">
             ${backFace(game)}
-            <div class="face front"><img src="${c.img}" alt="${esc(c.name)}"><div class="shine"></div>
+            <div class="face front">${cardArt(c, { lazy: false })}<div class="shine"></div>
               ${fresh.has(c.id) ? '<span class="new">NOUVEAU</span>' : ''}</div>
           </div>
         </div>`).join('')}
@@ -419,7 +424,7 @@ async function viewOpen(setKey) {
       el.classList.add('gone');
       const c = cards[i];
       tray.insertAdjacentHTML('beforeend',
-        `<button class="tray-card tier-${c.tier}" data-i="${i}" title="${esc(c.name)} · ${fmt(c.price)}"><img src="${c.img}" alt=""></button>`);
+        `<button class="tray-card tier-${c.tier}" data-i="${i}" title="${esc(c.name)} · ${c.price == null ? esc(c.rarity) : fmt(c.price)}">${cardArt(c)}</button>`);
     };
 
     const next = async () => {
@@ -441,7 +446,7 @@ async function viewOpen(setKey) {
       if (c.tier >= 5) setTimeout(() => stage.closest('.open').classList.add('quake'), 200);
       setTimeout(() => stage.closest('.open')?.classList.remove('quake'), 900);
       await sleep(420);
-      label.innerHTML = `<span>${esc(RARITY_LABEL(c.rarity))}</span><b>${fmt(c.price)}</b>${fresh.has(c.id) ? '<em>Nouvelle carte</em>' : ''}`;
+      label.innerHTML = `<span>${esc(RARITY_LABEL(c.rarity))}</span><b>${priceTag(c.price)}</b>${fresh.has(c.id) ? '<em>Nouvelle carte</em>' : ''}`;
       label.className = `scard-label tier-${c.tier}`;
       label.hidden = false;
       counter.textContent = `${current + 1} / ${cards.length}`;
@@ -462,7 +467,7 @@ async function viewOpen(setKey) {
     const finish = () => {
       stage.revealNext = null;
       const total = cards.reduce((s, c) => s + (c.price ?? 0), 0);
-      const best = cards.reduce((a, b) => ((b.price ?? 0) > (a.price ?? 0) ? b : a));
+      const best = bestOf(cards, set);
       const left = packsLeft(game.id);
       stage.innerHTML = `
         <div class="reveal">
@@ -471,16 +476,16 @@ async function viewOpen(setKey) {
               <div class="flip open tier-${c.tier}" style="--i:${i}" data-i="${i}">
                 <div class="flip-inner">
                   ${backFace(game)}
-                  <div class="face front tilt"><img src="${c.img}" alt="${esc(c.name)}"><div class="shine"></div>
+                  <div class="face front tilt">${cardArt(c, { lazy: false })}<div class="shine"></div>
                     ${fresh.has(c.id) ? '<span class="new">NOUVEAU</span>' : ''}</div>
                 </div>
-                <div class="flip-label"><span>${esc(RARITY_LABEL(c.rarity))}</span><b>${fmt(c.price)}</b></div>
+                <div class="flip-label"><span>${esc(RARITY_LABEL(c.rarity))}</span><b>${priceTag(c.price)}</b></div>
               </div>`).join('')}
           </div>
           <div class="reveal-bar">
             <div class="summary">
-              <div><span class="muted">Valeur du booster</span><b>${fmt(total)}</b></div>
-              <div><span class="muted">Meilleure carte</span><b>${esc(best.name)} · ${fmt(best.price)}</b></div>
+              ${best.price == null ? '' : `<div><span class="muted">Valeur du booster</span><b>${fmt(total)}</b></div>`}
+              <div><span class="muted">Meilleure carte</span><b>${esc(best.name)} · ${best.price == null ? esc(RARITY_LABEL(best.rarity)) : fmt(best.price)}</b></div>
               <div><span class="muted">Nouvelles cartes</span><b>${fresh.size}</b></div>
             </div>
             <div class="row">
@@ -557,7 +562,7 @@ async function viewCollectionSet(setKey) {
   const unique = Object.keys(col).filter(id => data.byId.has(id)).length;
   const value = Object.entries(col).reduce((s, [id, n]) => s + (data.byId.get(id)?.price ?? 0) * n, 0);
   app.querySelector('.summary-line').innerHTML =
-    `${esc(game.name)} · ${unique}/${data.cards.length} cartes (${Math.round((unique / data.cards.length) * 100)} %) · valeur <b class="accent">${fmt(value)}</b>`;
+    `${esc(game.name)} · ${unique}/${data.cards.length} cartes (${Math.round((unique / data.cards.length) * 100)} %)${game.sport ? '' : ` · valeur <b class="accent">${fmt(value)}</b>`}`;
 
   const grid = app.querySelector('.grid');
   const draw = () => {

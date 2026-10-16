@@ -66,6 +66,18 @@ Sources : TCGdex (Pokémon), Scryfall (Magic), YGOPRODeck (Yu-Gi-Oh!), Lorcast (
 
 TCGCSV couvre tous les jeux vendus sur TCGplayer : pour un nouveau jeu, trouve son `category` et le `group` du set sur https://tcgcsv.com/tcgplayer/categories puis utilise `source: 'tcgcsv'`.
 
+## Cartes sport (basket, football)
+
+Ce ne sont pas des TCG : il n'existe pas de base gratuite de cartes sport avec images. Les cartes sont donc **dessinées par le site** (photo du joueur, logo et couleurs du club, numéro, poste, cadre selon la rareté), sans prix.
+
+```
+npm run sports   # effectifs ESPN → public/data/basketball|soccer, boosters et dos dessinés
+```
+
+- Effectifs, logos et photos NBA : API publique ESPN. Photos des footballeurs : Wikipédia / Wikimedia Commons (licences libres).
+- Raretés : Base (ou Rookie / Espoir), Argent, Bleu /199, Or /10, Noir 1/1. Booster de 8 cartes : 6 bases, 1 base ou Argent, 1 parallèle garanti.
+- Ajouter une ligue : une entrée dans `GAMES` ([public/js/catalog.js](public/js/catalog.js)) avec `source: 'espn'` et le code ESPN de la ligue (`soccer/esp.1`, `soccer/ita.1`, `soccer/ger.1`…).
+
 ## Comptes en ligne (Supabase)
 
 Sans configuration, la collection reste dans le navigateur. Pour activer les comptes (collection, stats et decks synchronisés sur tous les appareils) :

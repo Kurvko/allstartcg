@@ -12,7 +12,8 @@
     "rates": "node scripts/simulate-rates.mjs",
     "index": "node scripts/build-index.mjs",
     "pokedex": "node scripts/fetch-pokedex.mjs",
-    "logos": "node scripts/fetch-logos.mjs"
+    "logos": "node scripts/fetch-logos.mjs",
+    "sports": "node scripts/fetch-sports.mjs && node scripts/make-sport-art.mjs && node scripts/build-index.mjs"
   },
   "devDependencies": {
     "sharp": "^0.33.5"

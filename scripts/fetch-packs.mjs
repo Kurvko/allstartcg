@@ -139,6 +139,7 @@ const groupsByCat = {};
 const misses = [];
 
 for (const { game, set, key } of allSets()) {
+  if (game.sport) continue; // boosters sport dessinés par make-sport-art.mjs
   if (missingOnly && mapping[key]?.length) continue;
   if (only.length && !only.some(o => key === o || key.startsWith(o + '/'))) continue;
   const cat = set.category ?? CATEGORY[game.id];

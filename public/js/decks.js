@@ -282,7 +282,9 @@ export function recommend(gameId, pool) {
 
 // ---------- Pages ----------
 
-const gameOf = id => GAMES.find(g => g.id === id);
+// Les cartes sport n'ont pas de règles de deck.
+const DECK_GAMES = GAMES.filter(g => RULES[g.id]);
+const gameOf = id => DECK_GAMES.find(g => g.id === id);
 const cover = (deck, byKey) => {
   const l = deck.leader && byKey.get(deck.leader);
   if (l) return l.card.img;
@@ -293,14 +295,14 @@ const cover = (deck, byKey) => {
 
 export async function viewDecks(path = '', helpers = {}) {
   if (path && !path.startsWith('jeu/')) return viewDeck(path, helpers);
-  const gameId = path.slice(4) || localStorage.getItem('allstar:deckGame') || GAMES[0].id;
+  const gameId = path.slice(4) || localStorage.getItem('allstar:deckGame') || DECK_GAMES[0].id;
   try { localStorage.setItem('allstar:deckGame', gameId); } catch { /* ignore */ }
-  const game = gameOf(gameId) ?? GAMES[0];
+  const game = gameOf(gameId) ?? DECK_GAMES[0];
   const rules = RULES[game.id];
   app.innerHTML = `
     <section class="page" style="--c:${game.color};--a:${game.accent}">
       <h1>Decks</h1>
-      <nav class="game-tabs">${GAMES.map(g => `<a href="#/decks/jeu/${g.id}" class="${g.id === game.id ? 'on' : ''}" style="--c:${g.color}">${esc(g.short ?? g.name)}</a>`).join('')}</nav>
+      <nav class="game-tabs">${DECK_GAMES.map(g => `<a href="#/decks/jeu/${g.id}" class="${g.id === game.id ? 'on' : ''}" style="--c:${g.color}">${esc(g.short ?? g.name)}</a>`).join('')}</nav>
       <p class="muted rules-line">📜 ${esc(rules.text)}</p>
       <div class="page-head"><h2>Mes decks ${esc(game.name)}</h2><button class="btn primary" data-new>+ Nouveau deck</button></div>
       <div class="deck-list mine"><p class="muted">Chargement…</p></div>
