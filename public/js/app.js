@@ -145,7 +145,8 @@ async function viewHome() {
     </section>
     ${GAMES.map(game => {
       const sets = newestFirst(game.sets);
-      const shown = sets.slice(0, HOME_SETS);
+      // Tuiles logo (plus larges, 4 par ligne) : 7 sets + « voir tout » = 2 lignes pleines.
+      const shown = sets.slice(0, game.sets.some(s => s.logo) ? 7 : HOME_SETS);
       return `
       <section class="game" style="--c:${game.color};--a:${game.accent}">
         <div class="game-head">
@@ -154,7 +155,7 @@ async function viewHome() {
           <span class="muted">${packsLeft(game.id)} / ${DAILY_PACKS} aujourd'hui</span>
           <a class="see-all" href="#/game/${game.id}">${sets.length} set${sets.length > 1 ? 's' : ''} →</a>
         </div>
-        <div class="set-row">
+        <div class="set-row ${game.sets.some(s => s.logo) ? 'logos' : ''}">
           ${shown.map(set => setTile(game, set, byKey[`${game.id}/${set.id}`])).join('')}
           ${sets.length > shown.length ? `
             <a class="set-tile more-tile" href="#/game/${game.id}">
@@ -169,7 +170,23 @@ const HOME_SETS = 5;
 // Les catalogues sont chronologiques : on inverse puis on trie par année (tri stable).
 const newestFirst = sets => [...sets].reverse().sort((a, b) => b.year - a.year);
 
+// Tuile « logo » façon opecards.fr : logo officiel du set sur fond clair, nombre de cartes, nom et code.
+function logoTile(game, set, row) {
+  const [code, title] = set.name.includes(' – ') ? set.name.split(' – ') : [set.id, set.name];
+  const pct = row.total ? Math.round((row.unique / row.total) * 100) : 0;
+  return `
+    <a class="set-tile logo-tile ${row.missing ? 'disabled' : ''}" href="#/open/${row.key}" data-name="${esc(set.name.toLowerCase())}">
+      <div class="lt-logo"><img src="${set.logo}" alt="${esc(title)}" loading="lazy"></div>
+      <span class="lt-count">${row.total} cartes</span>
+      <h3>${esc(title)}</h3>
+      <small class="lt-code">${esc(code.replace('-', ''))} · ${set.year}</small>
+      <div class="progress"><i style="width:${pct}%"></i></div>
+      <div class="set-tile-info"><span><i class="flag-fr" title="Version française"></i> ${row.unique}/${row.total}</span><b>${fmt(row.value)}</b></div>
+    </a>`;
+}
+
 function setTile(game, set, row) {
+  if (set.logo) return logoTile(game, set, row);
   if (row.missing) {
     return `<div class="set-tile disabled">${packHtml(game, set, '')}<p class="muted">Données absentes — lance <code>npm run fetch</code></p></div>`;
   }
@@ -205,7 +222,7 @@ async function viewGame(gameId) {
       ${[...groups].map(([label, sets]) => `
         <div class="set-group">
           ${groups.size > 1 ? `<h2>${esc(label)} <span class="muted">${sets[sets.length - 1].year}–${sets[0].year}</span></h2>` : ''}
-          <div class="set-row">${sets.map(set => setTile(game, set, byKey[`${game.id}/${set.id}`])).join('')}</div>
+          <div class="set-row ${game.sets.some(s => s.logo) ? 'logos' : ''}">${sets.map(set => setTile(game, set, byKey[`${game.id}/${set.id}`])).join('')}</div>
         </div>`).join('')}
       <p class="muted no-result" hidden>Aucun set ne correspond.</p>
     </section>`;

@@ -28,6 +28,11 @@ npm run packs -- --missing # seulement les sets qui n'ont pas encore de visuel
 npm run packs -- pokemon/me05 onepiece  # seulement ces sets / ce jeu
 ```
 
+## Logos des sets One Piece
+
+Les logos officiels français des sets One Piece (tuiles de l'accueil et des pages Sets) sont dans [public/logos/onepiece/](public/logos/onepiece/) (`<code du set>.webp`), repris d'[opecards.fr](https://www.opecards.fr/series).
+Pour un nouveau set, ajoute son logo sous le même nom : la tuile l'utilise automatiquement.
+
 ## Dos des cartes
 
 Les dos officiels de chaque jeu sont dans [public/backs/](public/backs/) (`<jeu>.webp`, 500×698).

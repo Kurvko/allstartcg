@@ -595,3 +595,39 @@ a.deck-tile:hover { border-color: var(--c); transform: translateY(-2px); }
   .cards-grid { grid-template-columns: repeat(3, 1fr); }
   .toolbar select { flex: 1; }
 }
+
+/* ---------- Tuiles « logo » (One Piece, façon opecards.fr) ---------- */
+.set-row.logos { grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 18px; }
+.logo-tile {
+  gap: 8px; padding: 0 0 14px; overflow: hidden;
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+}
+.logo-tile:hover { transform: translateY(-4px); border-color: var(--c); }
+.logo-tile > :not(.lt-logo) { margin-inline: 14px; }
+.lt-logo {
+  aspect-ratio: 16 / 9; display: grid; place-items: center; padding: 14px 18px;
+  background: radial-gradient(circle at 50% 40%, #fff, #e9ecf5);
+}
+.lt-logo img { max-width: 100%; max-height: 100%; object-fit: contain; transition: transform .3s; }
+.logo-tile:hover .lt-logo img { transform: scale(1.05); }
+.lt-count { margin-top: 4px; text-align: center; background: #22262f; color: #fff; border-radius: 8px; padding: 5px; font-size: 14px; font-weight: 600; }
+.logo-tile h3 { margin-top: 4px; margin-bottom: 0; font-size: 16px; line-height: 1.3; }
+.lt-code { color: var(--muted); font-style: italic; font-size: 13px; margin-top: -4px; }
+.flag-fr {
+  display: inline-block; width: 18px; height: 12px; border-radius: 2px; vertical-align: -1px; margin-right: 4px;
+  background: linear-gradient(90deg, #002395 33.3%, #fff 33.3% 66.6%, #ed2939 66.6%);
+}
+.set-logo.light { background: radial-gradient(circle, #fff, #e9ecf5); border-radius: 10px; padding: 4px 8px; height: 60px; }
+.set-logo.light img { max-height: 52px; }
+.set-row > * { min-width: 0; }
+@media (max-width: 720px) {
+  .set-row.logos { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .logo-tile { padding-bottom: 10px; gap: 6px; }
+  .logo-tile > :not(.lt-logo) { margin-inline: 9px; }
+  .lt-logo { padding: 8px 10px; }
+  .lt-count { font-size: 12px; padding: 3px; }
+  .logo-tile h3 { font-size: 13px; }
+  .lt-code { font-size: 11px; }
+  .logo-tile .set-tile-info { font-size: 11px; }
+}
+.set-row.logos .more-tile { aspect-ratio: auto; }

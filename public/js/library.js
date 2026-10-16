@@ -199,7 +199,7 @@ export async function viewSets(gameId) {
     if (!groups.has(label)) groups.set(label, []);
     groups.get(label).push(set);
   }
-  const logo = set => (game.id === 'pokemon' ? `https://assets.tcgdex.net/fr/${set.serie}/${set.id}/logo.webp` : packs[`${game.id}/${set.id}`]?.[0]);
+  const logo = set => set.logo ?? (game.id === 'pokemon' ? `https://assets.tcgdex.net/fr/${set.serie}/${set.id}/logo.webp` : packs[`${game.id}/${set.id}`]?.[0]);
   const owned = game.sets.reduce((s, set) => s + Object.keys(collection[`${game.id}/${set.id}`] ?? {}).length, 0);
   const total = game.sets.reduce((s, set) => s + (index[`${game.id}/${set.id}`]?.total ?? 0), 0);
 
@@ -218,7 +218,7 @@ export async function viewSets(gameId) {
           const img = logo(set);
           return `
             <a class="set-line ${pct === 100 ? 'done' : ''}" href="#/collection/${key}">
-              <span class="set-logo ${game.id === 'pokemon' ? '' : 'pack'}">${img ? `<img src="${img}" alt="" loading="lazy">` : ''}</span>
+              <span class="set-logo ${set.logo ? 'light' : game.id === 'pokemon' ? '' : 'pack'}">${img ? `<img src="${img}" alt="" loading="lazy">` : ''}</span>
               <span class="set-meta"><b>${esc(set.name)}</b><small class="muted">${set.date ? new Date(set.date).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) : set.year} · ${t} cartes</small></span>
               <span class="set-prog"><span>${n} / ${t}${pct === 100 ? ' ✓' : ''}</span><span class="progress"><i style="width:${pct}%"></i></span></span>
             </a>`;

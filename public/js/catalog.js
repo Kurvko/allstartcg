@@ -241,7 +241,8 @@ export const GAMES = [
         ['OP16', 24664, 'OP-16 – L\'Heure de la Bataille Décisive', 2026, 6],
         ['OP17', 24736, 'OP-17 – Les Guerriers les plus Puissants au Monde', 2026, 6],
       ].map(([id, group, name, year, packPrice]) => ({
-        id, name, year, packPrice, source: 'tcgcsv', category: 68, tcgGroup: group,
+        // Logo officiel français du set (public/logos/onepiece, repris d'opecards.fr).
+        id, name, year, packPrice, source: 'tcgcsv', category: 68, tcgGroup: group, logo: `logos/onepiece/${id}.webp`,
         tiers: OP_TIERS, slots: id.startsWith('PRB') ? PRB_SLOTS : OP_SLOTS, variants: OP_VARIANTS,
       })),
     ],
