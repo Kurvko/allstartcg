@@ -1,24 +1,25 @@
 // Chargement des sets (public/data) et génération des boosters.
 import { allSets, findSet } from './catalog.js';
 import { getState } from './store.js';
+import { versioned } from './ui.js';
 
 const cache = new Map();
 let indexPromise;
 
 /** Index léger : { "pokemon/base1": { total, chase: { name, img, price } } } */
 export function loadIndex() {
-  indexPromise ??= fetch('data/index.json').then(r => (r.ok ? r.json() : {})).catch(() => ({}));
+  indexPromise ??= fetch(versioned('data/index.json')).then(r => (r.ok ? r.json() : {})).catch(() => ({}));
   return indexPromise;
 }
 
 /** Visuels des boosters : { "pokemon/base1": ["packs/pokemon/base1-0.webp", …] } */
 export function loadPacks() {
-  return fetch('data/packs.json').then(r => (r.ok ? r.json() : {})).catch(() => ({}));
+  return fetch(versioned('data/packs.json')).then(r => (r.ok ? r.json() : {})).catch(() => ({}));
 }
 
 export async function loadSet(setKey) {
   if (!cache.has(setKey)) {
-    cache.set(setKey, fetch(`data/${setKey}.json`).then(r => {
+    cache.set(setKey, fetch(versioned(`data/${setKey}.json`)).then(r => {
       if (!r.ok) throw new Error(`Données manquantes pour ${setKey} — lance "npm run fetch".`);
       return r.json();
     }).then(data => {

@@ -2,12 +2,12 @@
 import { GAMES, findSet } from './catalog.js';
 import { loadIndex } from './data.js';
 import { getState } from './store.js';
-import { app, esc, fmt } from './ui.js';
+import { app, esc, fmt, versioned } from './ui.js';
 
 const PAGE = 120;
 const cache = new Map();
 const getJson = url => {
-  if (!cache.has(url)) cache.set(url, fetch(url).then(r => (r.ok ? r.json() : Promise.reject(new Error(`${url} : HTTP ${r.status}`)))).catch(err => { cache.delete(url); throw err; }));
+  if (!cache.has(url)) cache.set(url, fetch(versioned(url)).then(r => (r.ok ? r.json() : Promise.reject(new Error(`${url} : HTTP ${r.status}`)))).catch(err => { cache.delete(url); throw err; }));
   return cache.get(url);
 };
 
@@ -209,7 +209,7 @@ export async function viewSets(gameId) {
       ${tabs('sets', game.id)}
       <p class="muted">${game.sets.length} sets · ${owned} / ${total} cartes différentes possédées</p>
       ${[...groups].map(([label, sets]) => `
-        <h2 class="serie">${esc(label)} <small>${sets.length} sets</small></h2>
+        ${groups.size > 1 ? `<h2 class="serie">${esc(label)} <small>${sets.length} sets</small></h2>` : ""}
         <div class="set-list">${sets.map(set => {
           const key = `${game.id}/${set.id}`;
           const n = Object.keys(collection[key] ?? {}).length;
