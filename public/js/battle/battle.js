@@ -8,6 +8,8 @@ import {
 } from './engine.js';
 import { chooseAction, chooseSetup, bestPromotion, LEVELS } from './ai.js';
 import { buildDeck, basicEnergy, mainTypes } from './build.js';
+import { sfx } from '../sfx.js';
+import * as fx from '../fx.js';
 
 const TYPE_HEX = {
   Plante: '#30a46c', Feu: '#e5484d', Eau: '#3e8bff', Électrique: '#f5c518', Psy: '#b45cd6', Combat: '#c2703d',
@@ -213,10 +215,41 @@ function render(ui) {
 
   const logBox = board.querySelector('.blog');
   if (logBox) logBox.scrollTop = logBox.scrollHeight;
+  feedback(ui, board);
   bind(ui);
   if (g.winner != null && !ui.done) { ui.done = true; recordBattle(`pokemon/${ui.level}`, g.winner === 0); }
   if (g.current === 1 && !g.pending && g.winner == null && !ui.busy) aiTurn(ui);
   if (g.pending?.type === 'promote' && g.pending.players[0] === 1) { promote(g, 1, bestPromotion(g, 1)); render(ui); }
+}
+
+// Sons et impacts : on compare avec l'affichage précédent (dégâts reçus, K.O., cartes jouées, fin de partie).
+function feedback(ui, board) {
+  const g = ui.g, prev = ui.fx;
+  const now = { dmg: {}, prizes: g.players.map(p => p.prizes.length), hand: g.players.map(p => p.hand.length) };
+  for (const side of [0, 1]) {
+    for (const { zone, i, s } of SLOT_ZONES(g, side)) {
+      const key = `${side}|${s.stack[0]}`;
+      now.dmg[key] = s.damage;
+      const diff = s.damage - (prev?.dmg[key] ?? s.damage);
+      if (diff <= 0) continue;
+      const el = board.querySelector(`[data-slot="${side}|${zone}|${zone === 'active' ? 0 : i}"]`);
+      if (!el) continue;
+      el.classList.add('hit');
+      el.insertAdjacentHTML('beforeend', `<span class="dmg-pop">-${diff}</span>`);
+      const { x, y } = fx.center(el);
+      fx.burst(x, y, { n: 26, colors: ['#fff', '#ffb347', '#e5484d'], speed: 7, shapes: ['spark', 'star'], life: 40 });
+      sfx.hit(diff);
+    }
+  }
+  if (prev) {
+    if (now.prizes.some((n, side) => n < prev.prizes[side])) setTimeout(() => sfx.ko(), 250);
+    else if (now.hand.some((n, side) => n < prev.hand[side])) sfx.play();
+  }
+  if (g.winner != null && !ui.fxDone) {
+    ui.fxDone = true;
+    if (g.winner === 0) { setTimeout(() => { sfx.win(); fx.confettiRain(); }, 400); } else setTimeout(() => sfx.lose(), 400);
+  }
+  ui.fx = now;
 }
 
 function previewHtml(ui, uid) {

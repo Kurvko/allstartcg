@@ -114,3 +114,9 @@ Page **Combat** : un deck Pokémon (de ta collection, ou un deck de démo) contr
 - Effets des cartes lus dans le texte français : [public/js/battle/effects.js](public/js/battle/effects.js). Seuls les plus courants sont simulés.
 - IA : [public/js/battle/ai.js](public/js/battle/ai.js). Facile = au hasard, Normal = meilleur coup testé sur une copie de la partie (avec erreurs), Difficile = sans erreur et en anticipant l'attaque adverse.
 - Les données de combat (attaques, faiblesses, retraite…) viennent de TCGdex via `npm run fetch -- pokemon`.
+
+## Effets et sons
+
+- [public/js/fx.js](public/js/fx.js) : fond étoilé animé, particules (explosions, étincelles, confettis), flashs et ondes de choc, inclinaison 3D avec reflet holographique au survol des cartes et des boosters, apparition des éléments au défilement.
+- [public/js/sfx.js](public/js/sfx.js) : tous les sons sont fabriqués par le navigateur (Web Audio), sans fichier audio. Bouton 🔊 / 🔇 dans la barre du haut.
+- Ouverture d'un booster : la lumière qui sort du booster prend la couleur de la meilleure carte (bleu, violet, or, arc-en-ciel) ; les cartes rares se chargent avant d'être retournées.

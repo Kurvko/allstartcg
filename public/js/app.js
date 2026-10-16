@@ -1,5 +1,5 @@
 import { GAMES, MAX_PACKS, REFILL_MS, findSet } from './catalog.js';
-import { loadPacks, loadSet, openPack, collectionSummary } from './data.js';
+import { loadPacks, loadSet, openPack, collectionSummary, loadIndex } from './data.js';
 import { getState, packsLeft, nextPackIn, owned, recordPack, recordValue, resetAll, isFav, toggleFav, getFavorites } from './store.js';
 import { app, esc, fmt, cardArt } from './ui.js';
 import { initCloud } from './cloud.js';
@@ -7,6 +7,10 @@ import { viewAccount, accountBadge } from './account.js';
 import { viewDecks } from './decks.js';
 import { viewPokedex, viewSets, viewCards } from './library.js';
 import { viewBattle } from './battle/battle.js';
+import { sfx } from './sfx.js';
+import * as fx from './fx.js';
+
+const { TIER_COLOR } = fx;
 
 const PACKS = await loadPacks(); // { "pokemon/base1": ["packs/pokemon/base1-0.webp", …] }
 const modal = document.getElementById('modal');
@@ -113,6 +117,7 @@ function openModal(card, game, count, setKey) {
       </div>
     </div>`;
   modal.hidden = false;
+  sfx.whoosh(0.1);
   bindTilt(modal.querySelector('.tilt'));
   modal.querySelector('[data-fav-toggle]')?.addEventListener('click', e => {
     const on = toggleFav(setKey, card.id);
@@ -139,37 +144,43 @@ function bindTilt(el) {
   el.addEventListener('pointerleave', () => { el.style.setProperty('--rx', '0deg'); el.style.setProperty('--ry', '0deg'); });
 }
 
-function confetti(origin, color) {
-  const r = origin.getBoundingClientRect();
-  for (let i = 0; i < 40; i++) {
-    const p = document.createElement('i');
-    p.className = 'confetti';
-    p.style.left = `${r.left + r.width / 2}px`;
-    p.style.top = `${r.top + r.height / 2}px`;
-    p.style.background = i % 3 ? color : `hsl(${Math.random() * 360} 90% 65%)`;
-    p.style.setProperty('--dx', `${(Math.random() - 0.5) * 520}px`);
-    p.style.setProperty('--dy', `${(Math.random() - 0.8) * 420}px`);
-    p.style.setProperty('--rot', `${Math.random() * 720}deg`);
-    document.body.append(p);
-    setTimeout(() => p.remove(), 1400);
-  }
-}
-
 // ---------- Vues ----------
 
 async function viewHome() {
   const { rows, value } = await collectionSummary();
   const byKey = Object.fromEntries(rows.map(r => [r.key, r]));
   const leftNow = GAMES.reduce((s, g) => s + packsLeft(g.id), 0);
+  const showcase = await showcaseCards();
 
   app.innerHTML = `
     <section class="hero">
       <h1>Ouvre des boosters. <em>Sans dépenser un centime.</em></h1>
       <p>Jusqu'à ${MAX_PACKS} boosters gratuits par jeu, et un nouveau toutes les ${REFILL_LABEL}. Collectionne, complète tes sets, et regarde ta collection prendre de la valeur au prix réel du marché.</p>
-      <div class="hero-stats">
-        <div><b class="left" data-game="*">${leftNow}</b><span>boosters dispo maintenant</span></div>
-        <div><b>${fmt(value)}</b><span>valeur de ta collection</span></div>
-        <div>${countdown()}<span>prochain booster</span></div>
+      <div class="hero-main">
+        <div class="hero-side">
+          <div class="hero-stats">
+            <div><b class="left" data-game="*">${leftNow}</b><span>boosters dispo maintenant</span></div>
+            <div><b>${fmt(value)}</b><span>valeur de ta collection</span></div>
+            <div>${countdown()}<span>prochain booster</span></div>
+          </div>
+          <div class="hero-cta">
+            <button class="btn primary big" data-random ${leftNow ? '' : 'disabled'}>✦ Ouvrir un booster au hasard</button>
+            <a class="btn ghost" href="#/collection">Ma collection</a>
+          </div>
+        </div>
+        ${showcase.length ? `
+        <div class="showcase" aria-label="Les cartes les plus chères du site">
+          <div class="sc3d-stage">
+            <div class="ring" style="--n:${showcase.length}">
+              ${showcase.map((c, i) => `
+                <a class="sc3d" href="#/open/${c.key}" style="--i:${i}" title="${esc(c.name)} · ${fmt(c.price)}">
+                  <img class="sc3d-front" src="${c.img}" alt="${esc(c.name)}" loading="lazy">
+                  <span class="sc3d-back" ${c.back ? `style="background-image:url('${c.back}')"` : ''}></span>
+                </a>`).join('')}
+            </div>
+          </div>
+          <div class="showcase-floor"></div>
+        </div>` : ''}
       </div>
     </section>
     ${GAMES.map(game => {
@@ -193,6 +204,24 @@ async function viewHome() {
         </div>
       </section>`;
     }).join('')}`;
+
+  app.querySelector('[data-random]')?.addEventListener('click', () => {
+    const open = rows.filter(r => !r.missing && packsLeft(r.game.id) > 0);
+    if (open.length) location.hash = `#/open/${open[Math.floor(Math.random() * open.length)].key}`;
+  });
+}
+
+// Carrousel 3D de l'accueil : les cartes phares les plus chères (une par carte, sans les cartes sport).
+async function showcaseCards() {
+  const index = await loadIndex();
+  const seen = new Set();
+  return Object.entries(index)
+    .map(([key, m]) => ({ key, ...m.chase, game: findSet(key)?.game }))
+    .filter(c => c.img && c.price && c.game && !c.game.sport)
+    .sort((a, b) => b.price - a.price)
+    .filter(c => !seen.has(c.name) && seen.add(c.name))
+    .slice(0, 10)
+    .map(c => ({ ...c, back: c.game.back }));
 }
 
 const HOME_SETS = 5;
@@ -321,6 +350,8 @@ async function viewOpen(setKey) {
     const img = packImg();
     stage.innerHTML = `
       <div class="scene">
+        <div class="rays"></div>
+        <div class="aura"></div>
         <div class="pack3d-wrap">
           <div class="pack3d">
             <div class="p-front">
@@ -329,6 +360,7 @@ async function viewOpen(setKey) {
               <div class="p-top">${img ? `<img src="${img}" alt="">` : packHtml(game, set, chase.img)}</div>
               <div class="p-shine"${img ? ` style="-webkit-mask-image:url('${img}');mask-image:url('${img}')"` : ''}></div>
               <div class="p-cut"><i></i></div>
+              <div class="p-light"><i></i></div>
             </div>
             <div class="p-back">${img ? `<img src="${img}" alt="">` : ''}<span>✦</span></div>
           </div>
@@ -336,9 +368,10 @@ async function viewOpen(setKey) {
         <div class="stack"></div>
       </div>
       <div class="open-actions">
-        <button class="btn primary" data-open>✂ Ouvrir le booster</button>
+        <button class="btn primary big" data-open>✂ Ouvrir le booster</button>
         <p class="muted hint">Glisse le long du haut du booster pour le déchirer · ou appuie sur Espace</p>
       </div>`;
+    sfx.packIn();
 
     const scene = stage.querySelector('.scene');
     const pack = stage.querySelector('.pack3d');
@@ -349,8 +382,8 @@ async function viewOpen(setKey) {
       if (scene.classList.contains('opening')) return;
       const r = scene.getBoundingClientRect();
       const x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
-      pack.style.setProperty('--ry', `${x * 30}deg`);
-      pack.style.setProperty('--rx', `${-y * 20}deg`);
+      pack.style.setProperty('--ry', `${x * 34}deg`);
+      pack.style.setProperty('--rx', `${-y * 22}deg`);
       pack.style.setProperty('--mx', `${(x + 0.5) * 100}%`);
     });
     scene.addEventListener('pointerleave', () => { pack.style.setProperty('--ry', '0deg'); pack.style.setProperty('--rx', '0deg'); });
@@ -363,14 +396,20 @@ async function viewOpen(setKey) {
       const inTop = e.clientY >= r.top - 20 && e.clientY - r.top <= r.height * 0.3;
       if (!inX || !inTop || scene.classList.contains('opening')) return;
       e.preventDefault();
-      drag = { x0: e.clientX, w: r.width };
+      drag = { x0: e.clientX, x: e.clientX, w: r.width, left: r.left, y: r.top + r.height * 0.13 };
       scene.setPointerCapture(e.pointerId);
       scene.classList.add('cutting');
     });
     scene.addEventListener('pointermove', e => {
       if (!drag) return;
       const p = Math.min(1, Math.abs(e.clientX - drag.x0) / (drag.w * 0.8));
+      const speed = Math.abs(e.clientX - drag.x) / 18;
+      drag.x = e.clientX;
       cut.style.width = `${p * 100}%`;
+      if (speed > 0.05) {
+        sfx.rip(speed);
+        fx.sparks(Math.min(drag.left + drag.w, Math.max(drag.left, e.clientX)), drag.y, game.color);
+      }
       if (p >= 1) { drag = null; tear(); }
     });
     const release = () => {
@@ -393,22 +432,34 @@ async function viewOpen(setKey) {
     const cards = await openPack(setKey);
     const fresh = recordPack(game.id, setKey, cards); // enregistré tout de suite : recharger la page ne relance pas le tirage
     updateQuota();
+    // La lumière qui sort du booster annonce la meilleure carte (bleu, violet, or, arc-en-ciel).
+    const top = Math.max(...cards.map(c => c.tier));
 
     const scene = stage.querySelector('.scene');
     const pack = stage.querySelector('.pack3d');
     stage.querySelector('.open-actions').innerHTML = '<p class="muted hint">…</p>';
     const cut = stage.querySelector('.p-cut i');
-    scene.classList.add('opening');
+    scene.style.setProperty('--beam', TIER_COLOR[top]);
+    scene.classList.add('opening', `beam-${top}`);
     pack.style.setProperty('--ry', '0deg');
     pack.style.setProperty('--rx', '0deg');
     cut.style.transition = 'width .35s ease-out';
     cut.style.width = '100%';
+    sfx.tear();
     const loading = preload(cards.map(c => c.img).filter(Boolean));
     await sleep(380);
-    scene.classList.add('torn');                // la languette s'arrache
-    await Promise.all([loading, sleep(650)]);
+    scene.classList.add('torn');                // la languette s'arrache, la lumière jaillit
+    const lip = stage.querySelector('.p-light').getBoundingClientRect();
+    const beamColors = top >= 5 ? fx.RAINBOW : ['#fff', TIER_COLOR[top]];
+    fx.burst(lip.left + lip.width / 2, lip.top + lip.height / 2, {
+      n: 40 + top * 18, colors: beamColors, speed: 7 + top, angle: -Math.PI / 2, spread: Math.PI * 0.9, shapes: ['spark', 'star', 'dot'],
+    });
+    if (top >= 4) fx.flash(TIER_COLOR[top], top >= 5 ? 0.55 : 0.35, 700);
+    sfx.burstOut(top);
+    await Promise.all([loading, sleep(top >= 4 ? 1000 : 650)]);
     buildStack(cards, fresh);
     scene.classList.add('emerge');              // les cartes sortent, le booster tombe
+    sfx.whoosh();
     await sleep(1100);
     scene.classList.add('ready');
     busy = false;
@@ -418,12 +469,12 @@ async function viewOpen(setKey) {
   const buildStack = (cards, fresh) => {
     const stack = stage.querySelector('.stack');
     stack.innerHTML = `
+      <div class="stack-rays"></div>
       ${cards.map((c, i) => `
         <div class="scard tier-${c.tier}" style="--i:${i};--n:${cards.length}" data-i="${i}">
           <div class="scard-inner">
             ${backFace(game)}
-            <div class="face front">${cardArt(c, { lazy: false })}<div class="shine"></div>
-              ${fresh.has(c.id) ? '<span class="new">NOUVEAU</span>' : ''}</div>
+            <div class="face front">${cardArt(c, { lazy: false })}<div class="shine"></div></div>
           </div>
         </div>`).join('')}
       <div class="scard-label" hidden></div>`;
@@ -436,12 +487,26 @@ async function viewOpen(setKey) {
       </div>
       <p class="muted hint">Clique sur le paquet ou appuie sur Espace pour retourner la carte du dessus</p>`;
 
+    // « Nouveau » seulement sur le premier exemplaire d'une carte jamais eue.
+    const isNew = i => fresh.has(cards[i].id) && cards.findIndex(x => x.id === cards[i].id) === i;
     const els = [...stack.querySelectorAll('.scard')];
     const label = stack.querySelector('.scard-label');
     const tray = stage.querySelector('.tray');
     const counter = stage.querySelector('.counter');
     let current = -1;   // carte affichée face visible
     let flipping = false;
+    let shownTop = -1;  // meilleure rareté déjà révélée (pour « Tout révéler »)
+
+    // La carte retournée suit la souris en 3D, avec reflet holographique.
+    stack.addEventListener('pointermove', e => {
+      const r = stack.getBoundingClientRect();
+      const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+      stack.style.setProperty('--tx', `${(0.5 - y) * 22}deg`);
+      stack.style.setProperty('--ty', `${(x - 0.5) * 26}deg`);
+      stack.style.setProperty('--mx', `${x * 100}%`);
+      stack.style.setProperty('--my', `${y * 100}%`);
+    });
+    stack.addEventListener('pointerleave', () => { stack.style.setProperty('--tx', '0deg'); stack.style.setProperty('--ty', '0deg'); });
 
     const toTray = i => {
       const el = els[i];
@@ -453,26 +518,37 @@ async function viewOpen(setKey) {
 
     const next = async () => {
       if (flipping) return;
-      if (current >= 0) toTray(current);
+      if (current >= 0) { toTray(current); sfx.whoosh(0.07); }
       if (current === cards.length - 1) return finish();
       flipping = true;
       current++;
       const el = els[current], c = cards[current];
       label.hidden = true;
+      delete stack.dataset.glow;
       el.classList.add('top');
-      // Suspense : les grosses cartes s'illuminent avant d'être retournées.
+      // Suspense : les grosses cartes s'illuminent et aspirent la lumière avant d'être retournées.
       if (c.tier >= 3) {
+        const ms = c.tier >= 5 ? 1700 : c.tier >= 4 ? 1200 : 700;
         el.classList.add('charging');
-        await sleep(c.tier >= 5 ? 1300 : c.tier >= 4 ? 950 : 600);
+        stack.dataset.charge = c.tier;
+        const { x, y } = fx.center(el);
+        fx.converge(x, y, { colors: c.tier >= 5 ? fx.RAINBOW : ['#fff', TIER_COLOR[c.tier]], ms: ms - 150, rate: c.tier });
+        sfx.charge(c.tier, ms / 1000);
+        await sleep(ms);
+        delete stack.dataset.charge;
       }
       el.classList.add('flipped');
-      if (c.tier >= 4) setTimeout(() => confetti(el, game.color), 280);
-      if (c.tier >= 5) setTimeout(() => stage.closest('.open').classList.add('quake'), 200);
-      setTimeout(() => stage.closest('.open')?.classList.remove('quake'), 900);
-      await sleep(420);
-      label.innerHTML = `<span>${esc(RARITY_LABEL(c.rarity))}</span><b>${priceTag(c.price)}</b>${fresh.has(c.id) ? '<em>Nouvelle carte</em>' : ''}`;
+      sfx.flip();
+      setTimeout(() => el.classList.add('live'), 620);
+      await sleep(230);
+      shownTop = Math.max(shownTop, c.tier);
+      celebrate(el, c.tier);
+      if (c.tier >= 2) stack.dataset.glow = c.tier;
+      await sleep(200);
+      label.innerHTML = `<span>${esc(RARITY_LABEL(c.rarity))}</span><b>${priceTag(c.price)}</b>${isNew(current) ? '<em>✦ Nouvelle carte</em>' : ''}`;
       label.className = `scard-label tier-${c.tier}`;
       label.hidden = false;
+      if (isNew(current)) setTimeout(() => sfx.newCard(), 150);
       counter.textContent = `${current + 1} / ${cards.length}`;
       flipping = false;
     };
@@ -492,28 +568,30 @@ async function viewOpen(setKey) {
       stage.revealNext = null;
       const total = cards.reduce((s, c) => s + (c.price ?? 0), 0);
       const best = bestOf(cards, set);
+      const bestI = cards.indexOf(best);
       const left = packsLeft(game.id);
+      const worth = best.price != null && set.packPrice && total >= set.packPrice;
       stage.innerHTML = `
         <div class="reveal">
           <div class="cards">
             ${cards.map((c, i) => `
-              <div class="flip open tier-${c.tier}" style="--i:${i}" data-i="${i}">
+              <div class="flip open tier-${c.tier} ${i === bestI ? 'best' : ''}" style="--i:${i}" data-i="${i}">
                 <div class="flip-inner">
                   ${backFace(game)}
-                  <div class="face front tilt">${cardArt(c, { lazy: false })}<div class="shine"></div>
-                    ${fresh.has(c.id) ? '<span class="new">NOUVEAU</span>' : ''}</div>
+                  <div class="face front tilt">${cardArt(c, { lazy: false })}<div class="shine"></div></div>
                 </div>
                 <div class="flip-label"><span>${esc(RARITY_LABEL(c.rarity))}</span><b>${priceTag(c.price)}</b></div>
+                <div class="flip-tags">${i === bestI ? '<span class="best-tag">★ Meilleure</span>' : ''}${isNew(i) ? '<span class="new">✦ Nouveau</span>' : ''}</div>
               </div>`).join('')}
           </div>
           <div class="reveal-bar">
             <div class="summary">
-              ${best.price == null ? '' : `<div><span class="muted">Valeur du booster</span><b>${fmt(total)}</b></div>`}
+              ${best.price == null ? '' : `<div><span class="muted">Valeur du booster</span><b class="count-up" data-to="${total}">${fmt(0)}</b>${worth ? '<small class="good">Rentabilisé !</small>' : ''}</div>`}
               <div><span class="muted">Meilleure carte</span><b>${esc(best.name)} · ${best.price == null ? esc(RARITY_LABEL(best.rarity)) : fmt(best.price)}</b></div>
               <div><span class="muted">Nouvelles cartes</span><b>${fresh.size}</b></div>
             </div>
             <div class="row">
-              ${left > 0 ? `<button class="btn primary" data-again>Booster suivant (${left} restant${left > 1 ? 's' : ''})</button>` : `<button class="btn" data-again>Prochain booster dans ${countdown(game.id)}</button>`}
+              ${left > 0 ? `<button class="btn primary big" data-again>Booster suivant (${left} restant${left > 1 ? 's' : ''})</button>` : `<button class="btn" data-again>Prochain booster dans ${countdown(game.id)}</button>`}
               <a class="btn ghost" href="#/collection/${setKey}">Voir la collection</a>
             </div>
           </div>
@@ -523,13 +601,61 @@ async function viewOpen(setKey) {
         el.addEventListener('click', () => openModal(cards[+el.dataset.i], game, owned(setKey)[cards[+el.dataset.i].id], setKey));
       });
       stage.querySelector('[data-again]')?.addEventListener('click', showPack);
+      cards.forEach((_, i) => setTimeout(sfx.deal, 80 + i * 55));
+      countUp(stage.querySelector('.count-up'), 300 + cards.length * 55);
+      // « Tout révéler » avant la meilleure carte : on la fête quand même.
+      if (best.tier >= 3 && shownTop < best.tier) {
+        setTimeout(() => {
+          const el = stage.querySelector('.flip.best');
+          if (el) celebrate(el, best.tier);
+        }, 450 + bestI * 55);
+      }
       refreshTotal();
     };
+  };
+
+  // Effets de révélation selon la rareté.
+  const celebrate = (el, tier) => {
+    sfx.reveal(tier);
+    if (tier < 3) return;
+    const { x, y } = fx.center(el);
+    const colors = tier >= 5 ? fx.RAINBOW : ['#fff', TIER_COLOR[tier]];
+    fx.shockwave(x, y, TIER_COLOR[tier], { size: 160 + tier * 40 });
+    fx.burst(x, y, { n: tier >= 5 ? 220 : tier >= 4 ? 130 : 60, colors, speed: 6 + tier * 2, shapes: ['spark', 'star', 'dot'], life: 60 + tier * 10 });
+    if (tier >= 4) {
+      fx.flash(TIER_COLOR[tier], tier >= 5 ? 0.85 : 0.45, tier >= 5 ? 900 : 600);
+      fx.burst(x, y, { n: 60, colors, speed: 14, shapes: ['confetti'], gravity: 0.25, life: 120, size: 5, drag: 0.97 });
+    }
+    if (tier >= 5) {
+      setTimeout(() => fx.shockwave(x, y, '#fff', { size: 520, ms: 1000 }), 180);
+      setTimeout(() => fx.confettiRain(), 250);
+      const open = stage.closest('.open');
+      open?.classList.add('quake');
+      setTimeout(() => open?.classList.remove('quake'), 900);
+    }
   };
 
   stage.tear = tear;
   stage.showPack = showPack;
   showPack();
+}
+
+// Compteur qui monte jusqu'à la valeur du booster, avec un petit bruit de pièces.
+function countUp(el, delay = 0) {
+  if (!el) return;
+  const to = +el.dataset.to, ms = 900;
+  setTimeout(() => {
+    const t0 = performance.now();
+    let lastTick = 0;
+    const step = now => {
+      const p = Math.min(1, (now - t0) / ms), v = to * (1 - (1 - p) ** 3);
+      el.textContent = fmt(v);
+      if (now - lastTick > 70 && p < 1) { sfx.tick(); lastTick = now; }
+      if (p < 1) requestAnimationFrame(step);
+      else { sfx.coin(); el.classList.add('done'); }
+    };
+    requestAnimationFrame(step);
+  }, delay);
 }
 
 async function viewCollection() {

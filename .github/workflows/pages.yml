@@ -29,7 +29,9 @@ jobs:
       - name: Versionner les fichiers
         run: |
           V=${GITHUB_SHA::8}
-          sed -i -E "s#(from '\./[a-z0-9-]+\.js)'#\1?v=$V'#g" public/js/*.js
+          # Tous les modules (y compris battle/ et les imports « ../ ») : une seule URL par fichier,
+          # sinon le navigateur charge deux copies du même module (ex. deux sauvegardes store.js).
+          sed -i -E "s#(from '\.\.?/[a-z0-9/-]+\.js)'#\1?v=$V'#g" public/js/*.js public/js/battle/*.js
           sed -i -E "s#(src|href)=\"(js/app\.js|css/styles\.css)\"#\1=\"\2?v=$V\"#g; s#<meta name=\"build\" content=\"\"#<meta name=\"build\" content=\"$V\"#" public/index.html
           grep -c "?v=$V" public/index.html public/js/app.js
       - uses: actions/upload-pages-artifact@v3
