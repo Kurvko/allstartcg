@@ -28,10 +28,11 @@ npm run packs -- --missing # seulement les sets qui n'ont pas encore de visuel
 npm run packs -- pokemon/me05 onepiece  # seulement ces sets / ce jeu
 ```
 
-## Logos des sets One Piece
+## Logos des sets
 
-Les logos officiels français des sets One Piece (tuiles de l'accueil et des pages Sets) sont dans [public/logos/onepiece/](public/logos/onepiece/) (`<code du set>.webp`), repris d'[opecards.fr](https://www.opecards.fr/series).
-Pour un nouveau set, ajoute son logo sous le même nom : la tuile l'utilise automatiquement.
+Les tuiles des sets Pokémon et One Piece affichent le logo officiel du set (un booster s'il n'y a pas de logo) :
+- Pokémon : [public/logos/pokemon/](public/logos/pokemon/), logos TCGdex en français. Pour les nouveaux sets : `npm run logos`.
+- One Piece : [public/logos/onepiece/](public/logos/onepiece/) (`<code du set>.webp`), logos français et anglais repris d'[opecards.fr](https://www.opecards.fr/series).
 
 ## Dos des cartes
 

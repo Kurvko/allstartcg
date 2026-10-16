@@ -93,7 +93,7 @@ const PK_PRICE_OVERRIDE = { base1: 300 };
 function pokemonSet(s) {
   const era = PK_ERAS[s.serie] ?? PK_ERAS.sv;
   return {
-    id: s.id, name: s.name, year: +s.date.slice(0, 4), date: s.date, group: s.serieName, source: 'tcgdex', lang: 'fr', serie: s.serie,
+    id: s.id, name: s.name, year: +s.date.slice(0, 4), date: s.date, group: s.serieName, logo: `logos/pokemon/${s.id}.webp`, // npm run logos source: 'tcgdex', lang: 'fr', serie: s.serie,
     packPrice: PK_PRICE_OVERRIDE[s.id] ?? era.price, tiers: PK_TIERS, slots: PK_SET_SLOTS[s.id] ?? era.slots,
   };
 }
@@ -156,6 +156,7 @@ export const GAMES = [
     name: 'Pokémon',
     color: '#ffcb05',
     accent: '#3d7dca',
+    tileStyle: 'logo',
     sets: POKEMON_SETS.map(pokemonSet),
   },
   {
@@ -238,7 +239,8 @@ export const GAMES = [
         ['OP07', 23387, 'OP-07 – 500 Years in the Future', 2024, 7],
         ['OP08', 23462, 'OP-08 – Two Legends', 2024, 6],
       ].map(([id, group, name, year, packPrice]) => ({
-        id, name, year, packPrice, lang: 'en', group: 'Exclusifs version anglaise', source: 'tcgcsv', category: 68, tcgGroup: group,
+        // Logo anglais du set (public/logos/onepiece, repris d'opecards.fr).
+        id, name, year, packPrice, lang: 'en', group: 'Exclusifs version anglaise', source: 'tcgcsv', category: 68, tcgGroup: group, logo: `logos/onepiece/${id}.webp`,
         tiers: OP_TIERS, slots: OP_SLOTS, variants: OP_VARIANTS,
       })),
       // Sets sortis en français (VF lancée le 7 février 2025 avec OP-09).

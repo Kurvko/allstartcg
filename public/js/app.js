@@ -174,12 +174,13 @@ const newestFirst = sets => [...sets].reverse().sort((a, b) => b.year - a.year);
 function logoTile(game, set, row) {
   const [code, title] = set.name.includes(' – ') ? set.name.split(' – ') : [set.id, set.name];
   const pct = row.total ? Math.round((row.unique / row.total) * 100) : 0;
+  const pack = PACKS[row.key]?.[0];
   return `
     <a class="set-tile logo-tile ${row.missing ? 'disabled' : ''}" href="#/open/${row.key}" data-name="${esc(set.name.toLowerCase())}">
-      <div class="lt-logo ${set.logo ? '' : 'pack'}"><img src="${set.logo ?? PACKS[row.key]?.[0] ?? ''}" alt="${esc(title)}" loading="lazy"></div>
+      <div class="lt-logo ${set.logo ? '' : 'pack'}"><img src="${set.logo ?? pack ?? ''}" ${set.logo && pack ? `data-fallback="${pack}"` : ''} alt="${esc(title)}" loading="lazy"></div>
       <span class="lt-count">${row.total} cartes</span>
       <h3>${esc(title)}</h3>
-      <small class="lt-code">${esc(code.replace('-', ''))} · ${set.year}</small>
+      <small class="lt-code">${esc(code.replace('-', '').toUpperCase())} · ${set.year}</small>
       <div class="progress"><i style="width:${pct}%"></i></div>
       <div class="set-tile-info"><span>${set.lang === 'en' ? '<i class="flag-en" title="Version anglaise uniquement"></i>' : '<i class="flag-fr" title="Version française"></i>'} ${row.unique}/${row.total}</span><b>${fmt(row.value)}</b></div>
     </a>`;
@@ -695,6 +696,8 @@ window.addEventListener('hashchange', route);
 document.addEventListener('error', e => {
   const img = e.target;
   if (!(img instanceof HTMLImageElement)) return;
+  // Logo de set absent : visuel du booster à la place.
+  if (img.dataset.fallback) { img.src = img.dataset.fallback; img.parentElement.classList.add('pack'); delete img.dataset.fallback; return; }
   if (img.src.includes('assets.tcgdex.net/fr/')) img.src = img.src.replace('/fr/', '/en/');
   else img.style.visibility = 'hidden';
 }, true);

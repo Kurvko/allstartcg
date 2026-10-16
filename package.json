@@ -11,7 +11,8 @@
     "packs": "node scripts/fetch-packs.mjs",
     "rates": "node scripts/simulate-rates.mjs",
     "index": "node scripts/build-index.mjs",
-    "pokedex": "node scripts/fetch-pokedex.mjs"
+    "pokedex": "node scripts/fetch-pokedex.mjs",
+    "logos": "node scripts/fetch-logos.mjs"
   },
   "devDependencies": {
     "sharp": "^0.33.5"
