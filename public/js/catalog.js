@@ -224,7 +224,23 @@ export const GAMES = [
     name: 'One Piece',
     color: '#e23b3b',
     accent: '#1b3a6b',
+    tileStyle: 'logo', // tuiles façon opecards.fr au lieu des boosters
     sets: [
+      // Sets jamais sortis en français (avant le lancement de la VF) : version anglaise uniquement.
+      ...[
+        ['OP01', 3188, 'OP-01 – Romance Dawn', 2022, 15],
+        ['OP02', 17698, 'OP-02 – Paramount War', 2023, 9],
+        ['OP03', 22890, 'OP-03 – Pillars of Strength', 2023, 9],
+        ['OP04', 23024, 'OP-04 – Kingdoms of Intrigue', 2023, 8],
+        ['OP05', 23213, 'OP-05 – Awakening of the New Era', 2023, 12],
+        ['OP06', 23272, 'OP-06 – Wings of the Captain', 2024, 8],
+        ['EB01', 23333, 'EB-01 – Memorial Collection', 2024, 12],
+        ['OP07', 23387, 'OP-07 – 500 Years in the Future', 2024, 7],
+        ['OP08', 23462, 'OP-08 – Two Legends', 2024, 6],
+      ].map(([id, group, name, year, packPrice]) => ({
+        id, name, year, packPrice, lang: 'en', group: 'Exclusifs version anglaise', source: 'tcgcsv', category: 68, tcgGroup: group,
+        tiers: OP_TIERS, slots: OP_SLOTS, variants: OP_VARIANTS,
+      })),
       // Sets sortis en français (VF lancée le 7 février 2025 avec OP-09).
       ...[
         ['OP09', 23589, 'OP-09 – Les Nouveaux Empereurs', 2025, 6],
@@ -242,7 +258,7 @@ export const GAMES = [
         ['OP17', 24736, 'OP-17 – Les Guerriers les plus Puissants au Monde', 2026, 6],
       ].map(([id, group, name, year, packPrice]) => ({
         // Logo officiel français du set (public/logos/onepiece, repris d'opecards.fr).
-        id, name, year, packPrice, source: 'tcgcsv', category: 68, tcgGroup: group, logo: `logos/onepiece/${id}.webp`,
+        id, name, year, packPrice, lang: 'fr', group: 'Version française', source: 'tcgcsv', category: 68, tcgGroup: group, logo: `logos/onepiece/${id}.webp`,
         tiers: OP_TIERS, slots: id.startsWith('PRB') ? PRB_SLOTS : OP_SLOTS, variants: OP_VARIANTS,
       })),
     ],

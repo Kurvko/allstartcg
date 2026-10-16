@@ -631,3 +631,16 @@ a.deck-tile:hover { border-color: var(--c); transform: translateY(-2px); }
   .logo-tile .set-tile-info { font-size: 11px; }
 }
 .set-row.logos .more-tile { aspect-ratio: auto; }
+.lt-logo { min-height: 0; overflow: hidden; }
+/* Sans logo français : bande du titre du booster (nom du set + logo One Piece). */
+.lt-logo.pack { padding: 0; background: #11131c; position: relative; }
+.lt-logo.pack img { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; object-fit: cover; object-position: 50% 74%; }
+.flag-en {
+  display: inline-block; width: 18px; height: 12px; border-radius: 2px; vertical-align: -1px; margin-right: 4px;
+  background:
+    linear-gradient(#c8102e, #c8102e) center / 100% 2px no-repeat,
+    linear-gradient(#c8102e, #c8102e) center / 2px 100% no-repeat,
+    linear-gradient(#fff, #fff) center / 100% 4px no-repeat,
+    linear-gradient(#fff, #fff) center / 4px 100% no-repeat,
+    #012169;
+}
