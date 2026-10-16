@@ -27,6 +27,12 @@ npm run packs              # télécharge les vrais boosters (images TCGplayer),
 npm run packs -- --missing # seulement les sets qui n'ont pas encore de visuel
 ```
 
+## Dos des cartes
+
+Les dos officiels de chaque jeu sont dans [public/backs/](public/backs/) (`<jeu>.webp`, 500×698).
+Sources : Scryfall (Magic), YGOPRODeck (Yu-Gi-Oh!), pokemontcg.io (Pokémon), site officiel Bandai (Dragon Ball Fusion World),
+Wikipédia (Lorcana, One Piece, Riftbound). Pour en changer un, remplace le fichier en gardant le même nom.
+
 ## Taux de drop
 
 Les compositions et taux de chaque booster sont dans [public/js/catalog.js](public/js/catalog.js) (`slots`, poids = % par booster).

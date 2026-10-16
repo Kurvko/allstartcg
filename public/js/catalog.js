@@ -293,6 +293,9 @@ export const GAMES = [
   },
 ];
 
+// Dos officiel des cartes de chaque jeu (public/backs/<jeu>.webp).
+for (const game of GAMES) game.back = `backs/${game.id}.webp`;
+
 export function findSet(setKey) {
   for (const game of GAMES) {
     for (const set of game.sets) {

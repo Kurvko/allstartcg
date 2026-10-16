@@ -55,6 +55,11 @@ function packHtml(game, set, art, { big = false, img = null } = {}) {
     </div>`;
 }
 
+// Dos de carte : le vrai dos du jeu, sinon un dos dessiné.
+const backFace = game => (game.back
+  ? `<div class="face face-back real"><img src="${game.back}" alt=""></div>`
+  : `<div class="face face-back"><span>✦</span><small>${esc(game.short ?? game.name)}</small></div>`);
+
 function dots(gameId) {
   const left = packsLeft(gameId);
   return `<span class="dots" title="${left} booster(s) restant(s) aujourd'hui">${
@@ -367,7 +372,7 @@ async function viewOpen(setKey) {
       ${cards.map((c, i) => `
         <div class="scard tier-${c.tier}" style="--i:${i};--n:${cards.length}" data-i="${i}">
           <div class="scard-inner">
-            <div class="face face-back"><span>✦</span><small>${esc(game.short ?? game.name)}</small></div>
+            ${backFace(game)}
             <div class="face front"><img src="${c.img}" alt="${esc(c.name)}"><div class="shine"></div>
               ${fresh.has(c.id) ? '<span class="new">NOUVEAU</span>' : ''}</div>
           </div>
@@ -445,7 +450,7 @@ async function viewOpen(setKey) {
             ${cards.map((c, i) => `
               <div class="flip open tier-${c.tier}" style="--i:${i}" data-i="${i}">
                 <div class="flip-inner">
-                  <div class="face face-back"></div>
+                  ${backFace(game)}
                   <div class="face front tilt"><img src="${c.img}" alt="${esc(c.name)}"><div class="shine"></div>
                     ${fresh.has(c.id) ? '<span class="new">NOUVEAU</span>' : ''}</div>
                 </div>
