@@ -6,6 +6,7 @@ import { initCloud } from './cloud.js';
 import { viewAccount, accountBadge } from './account.js';
 import { viewDecks } from './decks.js';
 import { viewPokedex, viewSets, viewCards } from './library.js';
+import { viewBattle } from './battle/battle.js';
 
 const PACKS = await loadPacks(); // { "pokemon/base1": ["packs/pokemon/base1-0.webp", …] }
 const modal = document.getElementById('modal');
@@ -683,6 +684,7 @@ async function route() {
     else if (page === 'stats') await viewStats();
     else if (page === 'decks') await viewDecks(setKey, { openModal });
     else if (page === 'compte') await viewAccount();
+    else if (page === 'combat') await viewBattle();
     else if (page === 'pokedex') await viewPokedex(setKey, { openModal });
     else if (page === 'sets') await viewSets(setKey);
     else if (page === 'cartes') await viewCards(setKey, { openModal });

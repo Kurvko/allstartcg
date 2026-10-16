@@ -93,7 +93,7 @@ const PK_PRICE_OVERRIDE = { base1: 300 };
 function pokemonSet(s) {
   const era = PK_ERAS[s.serie] ?? PK_ERAS.sv;
   return {
-    id: s.id, name: s.name, year: +s.date.slice(0, 4), date: s.date, group: s.serieName, logo: `logos/pokemon/${s.id}.webp`, // npm run logos source: 'tcgdex', lang: 'fr', serie: s.serie,
+    id: s.id, name: s.name, year: +s.date.slice(0, 4), date: s.date, group: s.serieName, source: 'tcgdex', lang: 'fr', serie: s.serie, logo: `logos/pokemon/${s.id}.webp`, // logo : npm run logos
     packPrice: PK_PRICE_OVERRIDE[s.id] ?? era.price, tiers: PK_TIERS, slots: PK_SET_SLOTS[s.id] ?? era.slots,
   };
 }

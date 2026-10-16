@@ -9,6 +9,7 @@ const blank = () => ({
   totalPacks: {},   // { "pokemon/base1": 12 }
   history: {},      // { "2026-10-15": 123.45 } valeur de la collection par jour
   bestPulls: [],    // [{ setKey, id, name, img, price, at }]
+  battles: {},      // { "pokemon/difficile": { w: 3, l: 1 } } résultats des combats contre l'IA
   decks: {},        // { "<id>": { id, game, name, cards: { "pokemon/sv01|sv01-001": 2, "basic:Feu": 10 }, updatedAt } }
   deletedDecks: {}, // { "<id>": date de suppression } pour la synchro entre appareils
   resetAt: 0,       // date de la dernière réinitialisation de la collection
@@ -131,6 +132,10 @@ export function mergeStates(a, b) {
     if ((out.deletedDecks[d.id] ?? 0) >= d.updatedAt) continue;
     if (!out.decks[d.id] || out.decks[d.id].updatedAt < d.updatedAt) out.decks[d.id] = d;
   }
+  for (const x of [a, b]) for (const [k, r] of Object.entries(x.battles ?? {})) {
+    const o = (out.battles[k] ??= { w: 0, l: 0 });
+    o.w = Math.max(o.w, r.w); o.l = Math.max(o.l, r.l);
+  }
   out.updatedAt = Math.max(a.updatedAt, b.updatedAt);
   return out;
 }
@@ -139,4 +144,11 @@ export function mergeStates(a, b) {
 export function replaceState(next) {
   state = { ...blank(), ...next };
   save({ silent: true });
+}
+
+/** Résultat d'un combat contre l'IA. */
+export function recordBattle(key, won) {
+  const r = (state.battles[key] ??= { w: 0, l: 0 });
+  if (won) r.w++; else r.l++;
+  save();
 }

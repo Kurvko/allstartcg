@@ -102,3 +102,11 @@ Les Énergies de base (Pokémon) et terrains de base (Magic) sont illimités, co
 - Le tirage est enregistré dès l'ouverture : recharger la page ne relance pas un booster.
 - Réinitialiser la collection ne rend pas les boosters du jour.
 - Sans compte, la collection est enregistrée dans le navigateur (localStorage). Avec un compte, elle est aussi sauvegardée en ligne.
+
+## Combat Pokémon contre l'IA
+
+Page **Combat** : un deck Pokémon (de ta collection, ou un deck de démo) contre l'IA, en 3 niveaux.
+- Règles : [public/js/battle/engine.js](public/js/battle/engine.js) (Actif / Banc, Énergies, évolutions, Dresseurs, retraite, faiblesse / résistance, états spéciaux, Récompenses).
+- Effets des cartes lus dans le texte français : [public/js/battle/effects.js](public/js/battle/effects.js). Seuls les plus courants sont simulés.
+- IA : [public/js/battle/ai.js](public/js/battle/ai.js). Facile = au hasard, Normal = meilleur coup testé sur une copie de la partie (avec erreurs), Difficile = sans erreur et en anticipant l'attaque adverse.
+- Les données de combat (attaques, faiblesses, retraite…) viennent de TCGdex via `npm run fetch -- pokemon`.

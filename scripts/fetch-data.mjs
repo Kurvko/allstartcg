@@ -73,6 +73,14 @@ async function fromTcgdex(set) {
         kind: c.category === 'Pokémon' ? 'pokemon' : c.category === 'Énergie' ? 'energy' : 'trainer',
         colors: c.types, power: num(c.hp), stage: c.stage, from: c.evolveFrom, dex: c.dexId, sub: c.trainerType,
         basic: c.category === 'Énergie' && c.energyType === 'Normal',
+        // Données de combat (page Combat) : attaques, faiblesse, résistance, retraite, talents, texte des Dresseurs.
+        ex: c.suffix,
+        atk: c.attacks?.map(a => ({ n: a.name, c: a.cost ?? [], d: a.damage ?? '', e: a.effect })),
+        weak: c.weaknesses?.[0] && [c.weaknesses[0].type, c.weaknesses[0].value],
+        res: c.resistances?.[0] && [c.resistances[0].type, c.resistances[0].value],
+        retreat: c.retreat,
+        ab: c.abilities?.map(a => ({ n: a.name, e: a.effect })),
+        text: c.category !== 'Pokémon' ? c.effect : undefined,
       }),
     };
   });
