@@ -88,7 +88,7 @@ Sans configuration, la collection reste dans le navigateur. Pour activer les com
 4. **Project Settings → API** : copie *Project URL* et la clé *anon public* dans [public/js/config.js](public/js/config.js).
 
 La clé *anon* est publique par conception : chaque joueur ne peut lire et modifier que sa propre sauvegarde (règles RLS).
-Au moment de la connexion, ce qui est sur l'appareil est fusionné avec le compte. Les boosters du jour prennent le maximum des deux, donc changer d'appareil ne redonne pas de boosters.
+Au moment de la connexion, ce qui est sur l'appareil est fusionné avec le compte. Le stock de boosters prend le plus entamé des deux, donc changer d'appareil ne redonne pas de boosters.
 
 ## Decks
 
@@ -98,10 +98,14 @@ Les Énergies de base (Pokémon) et terrains de base (Magic) sont illimités, co
 
 ## Règles
 
-- 10 boosters par jeu et par jour (`DAILY_PACKS`), remis à zéro à minuit.
+- Boosters en stock rechargeable, par jeu : 8 au maximum (`MAX_PACKS`), un de plus toutes les 1h30 (`REFILL_MS`), donc stock plein en 12 h.
 - Le tirage est enregistré dès l'ouverture : recharger la page ne relance pas un booster.
-- Réinitialiser la collection ne rend pas les boosters du jour.
+- Réinitialiser la collection ne recharge pas le stock de boosters.
 - Sans compte, la collection est enregistrée dans le navigateur (localStorage). Avec un compte, elle est aussi sauvegardée en ligne.
+
+## Favoris
+
+Dans la fenêtre d'une carte (partout sur le site) : **☆ Ajouter aux favoris**. Les favoris ont une étoile sur leur vignette, un filtre « ★ Favoris » dans chaque set de la collection, et leur page **Favoris** (cartes possédées ou encore à chasser). Ils sont synchronisés avec le compte.
 
 ## Combat Pokémon contre l'IA
 

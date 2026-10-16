@@ -856,6 +856,23 @@ span.sc-gold > .sc-bg::after { background: conic-gradient(from 0deg at 50% 40%, 
 :root[data-theme="light"] .bside.me { background: linear-gradient(0deg, #3e8bff18, transparent); }
 :root[data-theme="light"] .bover { background: #f3f4facc; }
 /* textes à la couleur du jeu : plus foncés sur fond clair */
-:root[data-theme="light"] :is(.game-head h2, .see-all, .set-group h2, .open-head h1, .page-head h1, .binder-body small, .mon-head h1, .more-tile) {
+:root[data-theme="light"] :is(.game-title, .game-head h2, .see-all, .set-group h2, .open-head h1, .page-head h1, .binder-body small, .mon-head h1, .more-tile) {
   color: color-mix(in srgb, var(--c) 62%, #1a1206);
 }
+
+/* ---------- Favoris ---------- */
+.fav-badge {
+  position: absolute; top: 6px; left: 6px; z-index: 2; width: 24px; height: 24px; display: grid; place-items: center;
+  border-radius: 50%; background: #000b; color: #ffd36b; font-size: 14px; line-height: 1; box-shadow: 0 0 0 1px #ffd36b88;
+}
+.fav-badge[hidden] { display: none; }
+.thumb-info, .count { color: #fff; }
+.thumb-set { position: absolute; left: 0; right: 0; top: 0; padding: 6px 8px 14px 34px; font-size: 10px; color: #fff; text-align: left;
+  background: linear-gradient(#000c, transparent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.modal-actions { justify-content: flex-start; margin-top: 8px; }
+.fav-btn.on { border-color: #ffd36b; color: var(--gold); background: color-mix(in srgb, #ffd36b 14%, var(--panel)); }
+.refill { white-space: nowrap; }
+.game-title { color: var(--c); }
+/* La fenêtre de carte reste sombre, même en thème jour. */
+.modal { --text: #eef0ff; --muted: #8f96bd; --panel: #171c33; --line: #262d4d; --line2: #3a4374; --gold: #ffd36b; color: var(--text); color-scheme: dark; }
+.favorites .thumb.missing img { filter: grayscale(.7); opacity: .55; }

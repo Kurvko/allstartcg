@@ -1,7 +1,7 @@
 // Pokédex, Sets et Cartes : toute la base de cartes, avec ce que tu possèdes (inspiré de TCG Collector).
 import { GAMES, findSet } from './catalog.js';
 import { loadIndex } from './data.js';
-import { getState } from './store.js';
+import { getState, isFav } from './store.js';
 import { app, esc, fmt, versioned, cardArt } from './ui.js';
 
 const PAGE = 120;
@@ -45,6 +45,7 @@ function thumb(c) {
     <button class="thumb tier-${c.tier} ${c.owned ? '' : 'missing'}" data-key="${esc(c.setKey)}|${esc(c.i)}">
       ${cardArt(asCard(c))}
       ${c.owned > 1 ? `<span class="count">×${c.owned}</span>` : ''}
+      <span class="fav-badge" data-fav="${esc(c.setKey)}|${esc(c.i)}" ${isFav(c.setKey, c.i) ? '' : 'hidden'}>★</span>
       <span class="thumb-info"><span>${esc(c.n)}</span><b>${fmt(c.p)}</b></span>
     </button>`;
 }
@@ -58,7 +59,7 @@ function bindCards(root, cards, game, openModal) {
   root.addEventListener('click', e => {
     const b = e.target.closest('[data-key]'); if (!b) return;
     const c = byKey.get(b.dataset.key);
-    if (c) openModal?.(asCard(c), game, c.owned);
+    if (c) openModal?.(asCard(c), game, c.owned, c.setKey);
   });
 }
 

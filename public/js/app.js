@@ -1,6 +1,6 @@
-import { GAMES, DAILY_PACKS, findSet } from './catalog.js';
+import { GAMES, MAX_PACKS, REFILL_MS, findSet } from './catalog.js';
 import { loadPacks, loadSet, openPack, collectionSummary } from './data.js';
-import { getState, packsLeft, owned, recordPack, recordValue, resetAll } from './store.js';
+import { getState, packsLeft, nextPackIn, owned, recordPack, recordValue, resetAll, isFav, toggleFav, getFavorites } from './store.js';
 import { app, esc, fmt, cardArt } from './ui.js';
 import { initCloud } from './cloud.js';
 import { viewAccount, accountBadge } from './account.js';
@@ -16,12 +16,22 @@ const modal = document.getElementById('modal');
 const RARITY_LABEL = r => r.replace(/_/g, ' ');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-function untilMidnight() {
-  const now = new Date();
-  const ms = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1) - now;
+const duration = ms => {
   const h = Math.floor(ms / 3.6e6), m = Math.floor(ms / 6e4) % 60, s = Math.floor(ms / 1000) % 60;
-  return `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+  return `${h ? `${h}h ` : ''}${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+};
+const REFILL_LABEL = `${Math.floor(REFILL_MS / 3.6e6)}h${String((REFILL_MS / 6e4) % 60).padStart(2, '0')}`; // « 1h30 »
+
+// Prochain booster d'un jeu (ou de n'importe quel jeu si gameId est vide). Mis à jour chaque seconde.
+function nextPackText(gameId) {
+  const waits = (gameId ? [gameId] : GAMES.map(g => g.id)).map(nextPackIn).filter(Boolean);
+  return waits.length ? duration(Math.min(...waits) + 999) : 'Stock plein';
 }
+const countdown = (gameId = '') => `<b class="countdown" data-game="${gameId}">${nextPackText(gameId)}</b>`;
+// Stock d'un jeu : « 3 / 8 · +1 dans 42m 10s » ou « 8 / 8 · stock plein », mis à jour quand un booster se recharge.
+const leftTag = gameId => `<b class="left" data-game="${gameId}">${packsLeft(gameId)}</b>`;
+const refillText = gameId => (nextPackIn(gameId) ? ` · +1 dans ${countdown(gameId)}` : ' · stock plein');
+const stockLine = gameId => `${leftTag(gameId)} / ${MAX_PACKS}<span class="refill" data-game="${gameId}">${refillText(gameId)}</span>`;
 
 function preload(urls, timeout = 5000) {
   return Promise.race([
@@ -67,23 +77,27 @@ const backFace = game => (game.back
   ? `<div class="face face-back real"><img src="${game.back}" alt=""></div>`
   : `<div class="face face-back"><span>✦</span><small>${esc(game.short ?? game.name)}</small></div>`);
 
-function dots(gameId) {
+const dots = gameId => `<span class="dots" data-game="${gameId}">${dotsInner(gameId)}</span>`;
+const dotsInner = gameId => {
   const left = packsLeft(gameId);
-  return `<span class="dots" title="${left} booster(s) restant(s) aujourd'hui">${
-    Array.from({ length: DAILY_PACKS }, (_, i) => `<i class="${i < left ? 'on' : ''}"></i>`).join('')
-  }</span>`;
-}
+  return Array.from({ length: MAX_PACKS }, (_, i) => `<i class="${i < left ? 'on' : ''}"></i>`).join('');
+};
 
-function cardThumb(card, count, { missing = false } = {}) {
+function cardThumb(card, count, { missing = false, setKey = '' } = {}) {
   return `
-    <button class="thumb tier-${card.tier} ${missing ? 'missing' : ''}" data-card="${esc(card.id)}">
+    <button class="thumb tier-${card.tier} ${missing ? 'missing' : ''}" data-card="${esc(card.id)}" data-set="${esc(setKey)}">
       ${cardArt(card)}
+      ${favBadge(setKey, card.id)}
       ${count > 1 ? `<span class="count">×${count}</span>` : ''}
       <span class="thumb-info"><span>${esc(card.name)}</span><b>${card.sport ? esc(RARITY_LABEL(card.rarity)) : fmt(card.price)}</b></span>
     </button>`;
 }
 
-function openModal(card, game, count) {
+// Petite étoile sur les vignettes des cartes favorites.
+const favBadge = (setKey, id) => `<span class="fav-badge" data-fav="${esc(setKey)}|${esc(id)}" ${setKey && isFav(setKey, id) ? '' : 'hidden'}>★</span>`;
+const favButton = on => (on ? '★ Dans tes favoris' : '☆ Ajouter aux favoris');
+
+function openModal(card, game, count, setKey) {
   modal.innerHTML = `
     <div class="modal-inner" style="--c:${game.color}">
       <div class="tilt tier-${card.tier}">${cardArt(card, { hi: true, lazy: false })}<div class="shine"></div></div>
@@ -92,11 +106,20 @@ function openModal(card, game, count) {
         <p class="muted">${esc(RARITY_LABEL(card.rarity))}${card.num ? ` · n° ${esc(card.num)}` : ''}</p>
         ${card.price == null ? `<p class="muted">${esc(card.sport?.team ?? '')}${card.sport?.pos ? ` · ${esc(card.sport.pos)}` : ''}</p>` : `<p class="modal-price">${fmt(card.price)}</p>`}
         <p class="muted">${count ? `Tu en possèdes ${count}` : 'Pas encore dans ta collection'}</p>
-        <button class="btn ghost" data-close>Fermer</button>
+        <div class="row modal-actions">
+          ${setKey ? `<button class="btn fav-btn ${isFav(setKey, card.id) ? 'on' : ''}" data-fav-toggle>${favButton(isFav(setKey, card.id))}</button>` : ''}
+          <button class="btn ghost" data-close>Fermer</button>
+        </div>
       </div>
     </div>`;
   modal.hidden = false;
   bindTilt(modal.querySelector('.tilt'));
+  modal.querySelector('[data-fav-toggle]')?.addEventListener('click', e => {
+    const on = toggleFav(setKey, card.id);
+    e.currentTarget.classList.toggle('on', on);
+    e.currentTarget.textContent = favButton(on);
+    document.querySelectorAll(`.fav-badge[data-fav="${CSS.escape(`${setKey}|${card.id}`)}"]`).forEach(b => { b.hidden = !on; });
+  });
 }
 
 modal.addEventListener('click', e => {
@@ -137,16 +160,16 @@ function confetti(origin, color) {
 async function viewHome() {
   const { rows, value } = await collectionSummary();
   const byKey = Object.fromEntries(rows.map(r => [r.key, r]));
-  const leftToday = GAMES.reduce((s, g) => s + packsLeft(g.id), 0);
+  const leftNow = GAMES.reduce((s, g) => s + packsLeft(g.id), 0);
 
   app.innerHTML = `
     <section class="hero">
       <h1>Ouvre des boosters. <em>Sans dépenser un centime.</em></h1>
-      <p>${DAILY_PACKS} boosters gratuits par jeu et par jour. Collectionne, complète tes sets, et regarde ta collection prendre de la valeur au prix réel du marché.</p>
+      <p>Jusqu'à ${MAX_PACKS} boosters gratuits par jeu, et un nouveau toutes les ${REFILL_LABEL}. Collectionne, complète tes sets, et regarde ta collection prendre de la valeur au prix réel du marché.</p>
       <div class="hero-stats">
-        <div><b>${leftToday}</b><span>boosters dispo aujourd'hui</span></div>
+        <div><b class="left" data-game="*">${leftNow}</b><span>boosters dispo maintenant</span></div>
         <div><b>${fmt(value)}</b><span>valeur de ta collection</span></div>
-        <div><b class="countdown">${untilMidnight()}</b><span>avant les nouveaux boosters</span></div>
+        <div>${countdown()}<span>prochain booster</span></div>
       </div>
     </section>
     ${GAMES.map(game => {
@@ -158,7 +181,7 @@ async function viewHome() {
         <div class="game-head">
           <h2><a href="#/game/${game.id}">${esc(game.name)}</a></h2>
           ${dots(game.id)}
-          <span class="muted">${packsLeft(game.id)} / ${DAILY_PACKS} aujourd'hui</span>
+          <span class="muted">${stockLine(game.id)}</span>
           <a class="see-all" href="#/game/${game.id}">${sets.length} set${sets.length > 1 ? 's' : ''} →</a>
         </div>
         <div class="set-row ${game.tileStyle === 'logo' ? 'logos' : ''}">
@@ -223,7 +246,7 @@ async function viewGame(gameId) {
     <section class="page" style="--c:${game.color};--a:${game.accent}">
       <a href="#/" class="back">← Tous les jeux</a>
       <div class="page-head">
-        <div><h1>${esc(game.name)}</h1><p class="muted">${game.sets.length} sets · ${packsLeft(game.id)} / ${DAILY_PACKS} boosters restants aujourd'hui</p></div>
+        <div><h1>${esc(game.name)}</h1><p class="muted">${game.sets.length} sets · boosters : ${stockLine(game.id)}</p></div>
         <input class="search" type="search" placeholder="Rechercher un set…" aria-label="Rechercher un set">
       </div>
       ${[...groups].map(([label, sets]) => `
@@ -271,7 +294,7 @@ async function viewOpen(setKey) {
   const stage = app.querySelector('.stage');
   const quota = app.querySelector('.open-quota');
   const updateQuota = () => {
-    quota.innerHTML = `${dots(game.id)}<span class="quota-text">${packsLeft(game.id)} / ${DAILY_PACKS} restants aujourd'hui</span>`;
+    quota.innerHTML = `${dots(game.id)}<span class="quota-text">${stockLine(game.id)}</span>`;
   };
   // Une illustration au hasard parmi les versions du booster.
   const arts = PACKS[setKey] ?? [];
@@ -284,12 +307,12 @@ async function viewOpen(setKey) {
     const left = packsLeft(game.id);
     if (left <= 0) {
       stage.innerHTML = `
-        <div class="pack-stage">
+        <div class="pack-stage" data-wait="${game.id}">
           ${packHtml(game, set, chase.img, { big: true, img: packImg() })}
           <div class="limit">
-            <h3>C'est tout pour aujourd'hui 🌙</h3>
-            <p>Tes ${DAILY_PACKS} boosters ${esc(game.name)} du jour sont ouverts. Les prochains arrivent dans <b class="countdown">${untilMidnight()}</b>.</p>
-            <p class="muted">Tu peux encore ouvrir les boosters des autres jeux, ou admirer ta collection.</p>
+            <h3>Plus de booster pour l'instant ⏳</h3>
+            <p>Ton prochain booster ${esc(game.name)} arrive dans ${countdown(game.id)}.</p>
+            <p class="muted">Un booster se recharge toutes les ${REFILL_LABEL}, jusqu'à ${MAX_PACKS} en stock. En attendant, ouvre ceux des autres jeux ou admire ta collection.</p>
             <div class="row"><a class="btn" href="#/collection/${setKey}">Voir ma collection</a><a class="btn ghost" href="#/">Autres jeux</a></div>
           </div>
         </div>`;
@@ -460,7 +483,7 @@ async function viewOpen(setKey) {
     tray.addEventListener('click', e => {
       const b = e.target.closest('[data-i]'); if (!b) return;
       const c = cards[+b.dataset.i];
-      openModal(c, game, owned(setKey)[c.id]);
+      openModal(c, game, owned(setKey)[c.id], setKey);
     });
     stage.revealNext = next;
 
@@ -490,14 +513,14 @@ async function viewOpen(setKey) {
               <div><span class="muted">Nouvelles cartes</span><b>${fresh.size}</b></div>
             </div>
             <div class="row">
-              ${left > 0 ? `<button class="btn primary" data-again>Booster suivant (${left} restant${left > 1 ? 's' : ''})</button>` : `<span class="muted">Plus de boosters ${esc(game.name)} aujourd'hui.</span>`}
+              ${left > 0 ? `<button class="btn primary" data-again>Booster suivant (${left} restant${left > 1 ? 's' : ''})</button>` : `<button class="btn" data-again>Prochain booster dans ${countdown(game.id)}</button>`}
               <a class="btn ghost" href="#/collection/${setKey}">Voir la collection</a>
             </div>
           </div>
         </div>`;
       stage.querySelectorAll('.flip').forEach(el => {
         bindTilt(el.querySelector('.tilt'));
-        el.addEventListener('click', () => openModal(cards[+el.dataset.i], game, owned(setKey)[cards[+el.dataset.i].id]));
+        el.addEventListener('click', () => openModal(cards[+el.dataset.i], game, owned(setKey)[cards[+el.dataset.i].id], setKey));
       });
       stage.querySelector('[data-again]')?.addEventListener('click', showPack);
       refreshTotal();
@@ -505,6 +528,7 @@ async function viewOpen(setKey) {
   };
 
   stage.tear = tear;
+  stage.showPack = showPack;
   showPack();
 }
 
@@ -513,12 +537,12 @@ async function viewCollection() {
   app.innerHTML = `
     <section class="page">
       <h1>Ma collection</h1>
-      <p class="muted">${count} cartes · valeur totale <b class="accent">${fmt(value)}</b></p>
+      <p class="muted">${count} cartes · valeur totale <b class="accent">${fmt(value)}</b> · <a class="accent" href="#/favoris">★ Mes favoris (${getFavorites().length})</a></p>
       ${GAMES.map(game => {
         const mine = rows.filter(r => r.game === game && r.unique > 0).sort((a, b) => b.value - a.value);
         if (!mine.length) return '';
         return `
-          <h2 style="color:${game.color}">${esc(game.name)}</h2>
+          <h2 class="game-title" style="--c:${game.color}">${esc(game.name)}</h2>
           <div class="binder-list">${mine.map(r => `
             <a class="binder" href="#/collection/${r.key}" style="--c:${r.game.color};--a:${r.game.accent}">
               <div class="binder-art"><img src="${r.meta.chase.img}" alt="" loading="lazy"></div>
@@ -551,7 +575,7 @@ async function viewCollectionSet(setKey) {
       </div>
       <div class="toolbar">
         <div class="seg" data-filter>
-          <button data-v="all" class="on">Toutes</button><button data-v="owned">Possédées</button><button data-v="missing">Manquantes</button>
+          <button data-v="all" class="on">Toutes</button><button data-v="owned">Possédées</button><button data-v="missing">Manquantes</button><button data-v="fav">★ Favoris</button>
         </div>
         <select data-sort>
           <option value="num">Numéro</option><option value="price">Prix ↓</option><option value="tier">Rareté ↓</option>
@@ -572,7 +596,8 @@ async function viewCollectionSet(setKey) {
     if (filter === 'missing') cards = cards.filter(c => !col[c.id]);
     if (sort === 'price') cards.sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
     if (sort === 'tier') cards.sort((a, b) => b.tier - a.tier || (b.price ?? 0) - (a.price ?? 0));
-    grid.innerHTML = cards.map(c => cardThumb(c, col[c.id] ?? 0, { missing: !col[c.id] })).join('') ||
+    if (filter === 'fav') cards = cards.filter(c => isFav(setKey, c.id));
+    grid.innerHTML = cards.map(c => cardThumb(c, col[c.id] ?? 0, { missing: !col[c.id], setKey })).join('') ||
       '<p class="muted">Rien ici pour l\'instant.</p>';
   };
   app.querySelector('[data-filter]').addEventListener('click', e => {
@@ -584,7 +609,7 @@ async function viewCollectionSet(setKey) {
   app.querySelector('[data-sort]').addEventListener('change', e => { sort = e.target.value; draw(); });
   grid.addEventListener('click', e => {
     const b = e.target.closest('[data-card]'); if (!b) return;
-    openModal(data.byId.get(b.dataset.card), game, col[b.dataset.card]);
+    openModal(data.byId.get(b.dataset.card), game, col[b.dataset.card], setKey);
   });
   draw();
 }
@@ -612,7 +637,7 @@ async function viewStats() {
         ${state.bestPulls.map(p => {
           const { game } = findSet(p.setKey) ?? {};
           const card = rows.find(r => r.key === p.setKey)?.data?.byId.get(p.id);
-          return card ? `<div style="--c:${game.color}">${cardThumb(card, 0)}</div>` : '';
+          return card ? `<div style="--c:${game.color}">${cardThumb(card, 0, { setKey: p.setKey })}</div>` : '';
         }).join('') || '<p class="muted">Ouvre ton premier booster !</p>'}
       </div>
       <h2>Par set</h2>
@@ -631,10 +656,10 @@ async function viewStats() {
     const pull = state.bestPulls.find(p => p.id === b.dataset.card);
     const { game } = findSet(pull.setKey);
     const card = rows.find(r => r.key === pull.setKey).data.byId.get(pull.id);
-    openModal(card, game, owned(pull.setKey)[pull.id]);
+    openModal(card, game, owned(pull.setKey)[pull.id], pull.setKey);
   });
   app.querySelector('[data-reset]').addEventListener('click', () => {
-    if (confirm('Effacer toute ta collection et tes statistiques ? (Les boosters déjà ouverts aujourd\'hui restent comptés.)')) {
+    if (confirm('Effacer toute ta collection et tes statistiques ? (Ton stock de boosters ne se recharge pas pour autant.)')) {
       resetAll();
       route();
     }
@@ -660,6 +685,36 @@ function chart(points) {
     </svg>`;
 }
 
+async function viewFavorites() {
+  const items = (await Promise.all(getFavorites().map(async f => {
+    const found = findSet(f.setKey);
+    if (!found) return null;
+    try {
+      const card = (await loadSet(f.setKey)).byId.get(f.id);
+      return card && { ...f, ...found, card };
+    } catch { return null; }
+  }))).filter(Boolean);
+  const byGame = GAMES.map(g => [g, items.filter(x => x.game === g)]).filter(([, list]) => list.length);
+  app.innerHTML = `
+    <section class="page favorites">
+      <a href="#/collection" class="back">← Collection</a>
+      <h1>★ Mes favoris</h1>
+      <p class="muted">${items.length ? `${items.length} carte${items.length > 1 ? 's' : ''} · ` : ''}Ouvre une carte et clique sur « ☆ Ajouter aux favoris » pour la retrouver ici, que tu l'aies déjà ou que tu la chasses encore.</p>
+      ${byGame.map(([game, list]) => `
+        <h2 class="game-title" style="--c:${game.color}">${esc(game.name)}</h2>
+        <div class="grid">${list.map(x => {
+          const n = owned(x.setKey)[x.id] ?? 0;
+          return cardThumb(x.card, n, { missing: !n, setKey: x.setKey })
+            .replace('<span class="thumb-info">', `<span class="thumb-set">${esc(x.set.name)}</span><span class="thumb-info">`);
+        }).join('')}</div>`).join('') || '<p>Aucun favori pour l’instant.</p>'}
+    </section>`;
+  app.querySelector('.favorites').addEventListener('click', e => {
+    const b = e.target.closest('[data-card]'); if (!b) return;
+    const x = items.find(i => i.setKey === b.dataset.set && i.id === b.dataset.card);
+    if (x) openModal(x.card, x.game, owned(x.setKey)[x.id], x.setKey);
+  });
+}
+
 function viewNotFound() {
   app.innerHTML = '<section class="page"><h1>Page introuvable</h1><a class="btn" href="#/">Retour aux boosters</a></section>';
 }
@@ -682,6 +737,7 @@ async function route() {
     else if (page === 'open') await viewOpen(setKey);
     else if (page === 'collection') await (setKey ? viewCollectionSet(setKey) : viewCollection());
     else if (page === 'stats') await viewStats();
+    else if (page === 'favoris') await viewFavorites();
     else if (page === 'decks') await viewDecks(setKey, { openModal });
     else if (page === 'compte') await viewAccount();
     else if (page === 'combat') await viewBattle();
@@ -716,7 +772,23 @@ document.addEventListener('keydown', e => {
   if (stage.revealNext) stage.revealNext();
   else if (stage.querySelector('[data-open]')) stage.tear();
 });
-setInterval(() => document.querySelectorAll('.countdown').forEach(el => { el.textContent = untilMidnight(); }), 1000);
+// Chaque seconde : comptes à rebours, et mise à jour du stock quand un booster se recharge.
+let lastLeft = GAMES.map(g => packsLeft(g.id)).join();
+setInterval(() => {
+  document.querySelectorAll('.countdown').forEach(el => { el.textContent = nextPackText(el.dataset.game); });
+  const left = GAMES.map(g => packsLeft(g.id)).join();
+  if (left === lastLeft) return;
+  lastLeft = left;
+  document.querySelectorAll('.left[data-game]').forEach(el => {
+    el.textContent = el.dataset.game === '*' ? GAMES.reduce((n, g) => n + packsLeft(g.id), 0) : packsLeft(el.dataset.game);
+  });
+  document.querySelectorAll('.dots[data-game]').forEach(el => { el.innerHTML = dotsInner(el.dataset.game); });
+  document.querySelectorAll('.refill[data-game]').forEach(el => { el.innerHTML = refillText(el.dataset.game); });
+  // Écran « plus de booster » : le booster revenu s'affiche tout seul.
+  const stage = app.querySelector('.stage');
+  const wait = stage?.querySelector('[data-wait]');
+  if (wait && packsLeft(wait.dataset.wait) > 0) stage.showPack();
+}, 1000);
 
 route();
 refreshTotal();

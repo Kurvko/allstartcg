@@ -1,14 +1,15 @@
 // État du joueur, sauvegardé dans le navigateur (localStorage).
-import { DAILY_PACKS } from './catalog.js';
+import { MAX_PACKS, REFILL_MS } from './catalog.js';
 
 const KEY = 'allstartcg:v1';
 
 const blank = () => ({
   collection: {},   // { "pokemon/base1": { "base1-4": 2, ... } }
-  opened: {},       // { "2026-10-15": { pokemon: 3 } }
+  packs: {},        // { pokemon: 1760000000000 } heure à laquelle le stock de boosters du jeu sera plein
   totalPacks: {},   // { "pokemon/base1": 12 }
   history: {},      // { "2026-10-15": 123.45 } valeur de la collection par jour
   bestPulls: [],    // [{ setKey, id, name, img, price, at }]
+  favorites: {},    // { "pokemon/sv01|sv01-001": { on: true, at } } cartes favorites
   battles: {},      // { "pokemon/difficile": { w: 3, l: 1 } } résultats des combats contre l'IA
   decks: {},        // { "<id>": { id, game, name, cards: { "pokemon/sv01|sv01-001": 2, "basic:Feu": 10 }, updatedAt } }
   deletedDecks: {}, // { "<id>": date de suppression } pour la synchro entre appareils
@@ -16,14 +17,29 @@ const blank = () => ({
   updatedAt: 0,
 });
 
+export const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 let state = load();
 
 function load() {
   try {
-    return { ...blank(), ...JSON.parse(localStorage.getItem(KEY) ?? '{}') };
+    return migrate({ ...blank(), ...JSON.parse(localStorage.getItem(KEY) ?? '{}') });
   } catch {
     return blank();
   }
+}
+
+// Anciennes sauvegardes (10 boosters par jour) : les boosters ouverts aujourd'hui sont décomptés du stock.
+function migrate(s) {
+  if (s.opened) {
+    const day = s.opened[today()] ?? {};
+    for (const [game, n] of Object.entries(day)) s.packs[game] ??= Date.now() + Math.min(MAX_PACKS, n) * REFILL_MS;
+    delete s.opened;
+  }
+  return s;
 }
 
 const listeners = new Set();
@@ -36,22 +52,26 @@ function save({ silent = false } = {}) {
   if (!silent) for (const fn of listeners) fn(state);
 }
 
-export const today = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
-
 export const getState = () => state;
 
-export const packsLeft = gameId => DAILY_PACKS - (state.opened[today()]?.[gameId] ?? 0);
+// ---------- Boosters : un stock qui se recharge ----------
+// On garde seulement l'heure à laquelle le stock sera plein : chaque booster ouvert la repousse de 1h30.
+
+const missing = gameId => Math.max(0, Math.ceil(((state.packs[gameId] ?? 0) - Date.now()) / REFILL_MS));
+
+export const packsLeft = gameId => Math.max(0, MAX_PACKS - missing(gameId));
+
+/** Millisecondes avant le prochain booster (0 si le stock est plein). */
+export function nextPackIn(gameId) {
+  const m = missing(gameId);
+  return m ? (state.packs[gameId] - (m - 1) * REFILL_MS) - Date.now() : 0;
+}
 
 export const owned = setKey => state.collection[setKey] ?? {};
 
 /** Enregistre un booster ouvert. Retourne les ids des cartes nouvelles pour la collection. */
 export function recordPack(gameId, setKey, cards) {
-  const day = today();
-  state.opened[day] ??= {};
-  state.opened[day][gameId] = (state.opened[day][gameId] ?? 0) + 1;
+  state.packs[gameId] = Math.max(state.packs[gameId] ?? 0, Date.now()) + REFILL_MS;
   state.totalPacks[setKey] = (state.totalPacks[setKey] ?? 0) + 1;
 
   const col = (state.collection[setKey] ??= {});
@@ -66,8 +86,6 @@ export function recordPack(gameId, setKey, cards) {
   state.bestPulls.sort((a, b) => b.price - a.price);
   state.bestPulls = state.bestPulls.slice(0, 12);
 
-  // Seul le compteur du jour compte.
-  for (const d of Object.keys(state.opened)) if (d !== day) delete state.opened[d];
   save();
   return fresh;
 }
@@ -77,9 +95,9 @@ export function recordValue(value) {
   save();
 }
 
-/** Efface la collection. Le quota du jour est conservé (pas de boosters bonus en réinitialisant). */
+/** Efface la collection. Le stock de boosters est conservé (pas de boosters bonus en réinitialisant). */
 export function resetAll() {
-  state = { ...blank(), opened: state.opened, decks: state.decks, deletedDecks: state.deletedDecks, resetAt: Date.now() };
+  state = { ...blank(), packs: state.packs, decks: state.decks, deletedDecks: state.deletedDecks, resetAt: Date.now() };
   save();
 }
 
@@ -108,7 +126,7 @@ const maxInto = (target, src) => { for (const [k, v] of Object.entries(src ?? {}
 
 /**
  * Fusionne deux sauvegardes (cet appareil + compte en ligne) sans rien perdre :
- * cartes et boosters ouverts du jour = maximum des deux (le quota ne peut pas être contourné),
+ * cartes = maximum des deux, stock de boosters = le plus entamé des deux (impossible de le contourner),
  * decks = version la plus récente, réinitialisation respectée.
  */
 export function mergeStates(a, b) {
@@ -122,7 +140,8 @@ export function mergeStates(a, b) {
     maxInto(out.totalPacks, x.totalPacks);
     maxInto(out.history, x.history);
   }
-  for (const x of [a, b]) for (const [day, games] of Object.entries(x.opened)) maxInto(out.opened[day] ??= {}, games);
+  for (const x of [a, b]) maxInto(out.packs, migrate({ ...x, packs: { ...x.packs } }).packs);
+  for (const x of [a, b]) for (const [k, f] of Object.entries(x.favorites ?? {})) if (!out.favorites[k] || out.favorites[k].at < f.at) out.favorites[k] = f;
   const seen = new Set();
   out.bestPulls = live.flatMap(x => x.bestPulls)
     .filter(p => { const k = `${p.setKey}|${p.id}|${p.at}`; return !seen.has(k) && seen.add(k); })
@@ -142,7 +161,7 @@ export function mergeStates(a, b) {
 
 /** Remplace l'état local (après fusion avec le compte). */
 export function replaceState(next) {
-  state = { ...blank(), ...next };
+  state = migrate({ ...blank(), ...next });
   save({ silent: true });
 }
 
@@ -152,3 +171,21 @@ export function recordBattle(key, won) {
   if (won) r.w++; else r.l++;
   save();
 }
+
+// ---------- Favoris ----------
+
+export const favKey = (setKey, id) => `${setKey}|${id}`;
+export const isFav = (setKey, id) => !!state.favorites[favKey(setKey, id)]?.on;
+
+/** Ajoute ou retire une carte des favoris. Retourne le nouvel état. */
+export function toggleFav(setKey, id) {
+  const on = !isFav(setKey, id);
+  state.favorites[favKey(setKey, id)] = { on, at: Date.now() };
+  save();
+  return on;
+}
+
+/** Favoris du plus récent au plus ancien : [{ setKey, id, at }]. */
+export const getFavorites = () => Object.entries(state.favorites)
+  .filter(([, f]) => f.on).sort(([, a], [, b]) => b.at - a.at)
+  .map(([k, f]) => { const i = k.lastIndexOf('|'); return { setKey: k.slice(0, i), id: k.slice(i + 1), at: f.at }; });

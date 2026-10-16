@@ -6,7 +6,8 @@
 
 import { POKEMON_SETS } from './pokemon-sets.js';
 
-export const DAILY_PACKS = 10; // boosters par jeu et par jour
+export const MAX_PACKS = 8;              // boosters en stock au maximum, par jeu
+export const REFILL_MS = 90 * 60 * 1000;  // un booster de plus toutes les 1h30 (stock plein en 12 h)
 export const USD_TO_EUR = 0.92;
 // packPrice : prix indicatif (EUR) d'un booster scellé, pour le compteur « argent économisé ».
 // group : intitulé de la série, pour regrouper les sets sur la page du jeu.

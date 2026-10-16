@@ -533,7 +533,7 @@ async function viewDeck(id, { openModal } = {}) {
       deck.leader = null; persist(); redraw();
     } else if (t.dataset.info) {
       const entry = byKey.get(t.dataset.info);
-      openModal?.(entry.card, game, entry.owned);
+      openModal?.(entry.card, game, entry.owned, entry.setKey);
     } else if ('more' in t.dataset) {
       shown += 120; drawPool();
     } else if ('export' in t.dataset) {
